@@ -28,7 +28,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => data.subscription.unsubscribe()
   }, [])
 
-  if (state.status === 'loading') return <main className="page justify-center text-center"><p className="text-muted">Cargando…</p></main>
+  if (state.status === 'loading') return <main className="page justify-center text-center"><p className="text-muted" role="status">Cargando…</p></main>
   if (state.status === 'out') return <Login />
   if (state.status === 'forbidden') {
     return (

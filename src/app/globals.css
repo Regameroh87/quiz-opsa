@@ -39,6 +39,8 @@
   .card { @apply flex flex-col gap-3 rounded-card bg-surface p-5; }
   .input { @apply w-full rounded-[10px] border-2 border-line bg-bg p-3.5 text-text focus:border-brand focus:outline-none; }
   .btn { @apply rounded-[10px] bg-brand px-5 py-3.5 text-center font-bold text-brand-contrast; }
+  /* Acción principal repetida (una por fila): se reconoce sin competir con el amarillo sólido. */
+  .btn-outline { @apply rounded-[10px] border-2 border-brand bg-transparent px-5 py-3 text-center font-bold text-brand enabled:hover:bg-brand enabled:hover:text-brand-contrast enabled:focus-visible:bg-brand enabled:focus-visible:text-brand-contrast; }
   .btn-secondary { @apply rounded-[10px] border-2 border-muted bg-transparent px-5 py-3.5 text-center font-bold text-text; }
   .badge { @apply rounded-full bg-surface px-3 py-1 font-semibold text-muted; }
   .timer { @apply text-[2.4rem] font-extrabold tabular-nums; }

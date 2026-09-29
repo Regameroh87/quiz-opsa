@@ -90,6 +90,9 @@ function LiveGames({ live, onRetry }: { live: LiveState; onRetry: () => void }) 
 function Account({ liveCount }: { liveCount: number }) {
   const [email, setEmail] = useState('')
   const [confirming, setConfirming] = useState(false)
+  // Al cancelar, el foco vuelve a "Cerrar sesión" en vez de perderse en <body>.
+  const [cancelled, setCancelled] = useState(false)
+  const cancel = () => { setConfirming(false); setCancelled(true) }
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => setEmail(data.session?.user.email ?? ''))
   }, [])
@@ -99,18 +102,19 @@ function Account({ liveCount }: { liveCount: number }) {
 
   if (confirming) {
     return (
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2" role="alert" onKeyDown={(e) => e.key === 'Escape' && setConfirming(false)}>
+      // Keys distintas: cada variante monta sus propios botones, así autoFocus aplica al volver.
+      <div key="confirm" className="flex flex-wrap items-center gap-x-4 gap-y-2" role="alert" onKeyDown={(e) => e.key === 'Escape' && cancel()}>
         <span>{liveCount === 1 ? 'Tenés una partida en curso' : 'Tenés partidas en curso'}: si salís, la pantalla de la sala deja de responder.</span>
         <button className={DANGER} onClick={signOut}>Salir igual</button>
-        <button className={QUIET} onClick={() => setConfirming(false)} autoFocus>Cancelar</button>
+        <button className={QUIET} onClick={cancel} autoFocus>Cancelar</button>
       </div>
     )
   }
   return (
-    <div className="flex min-w-0 items-center gap-3">
+    <div key="account" className="flex min-w-0 items-center gap-3">
       <span className="min-w-0 truncate text-muted" title={email}>{email}</span>
       {/* Salir con una partida abierta corta la pantalla del host: se confirma primero. */}
-      <button className={`${QUIET} shrink-0`} onClick={() => (liveCount > 0 ? setConfirming(true) : signOut())}>Cerrar sesión</button>
+      <button className={`${QUIET} shrink-0`} autoFocus={cancelled} onClick={() => (liveCount > 0 ? setConfirming(true) : signOut())}>Cerrar sesión</button>
     </div>
   )
 }
@@ -146,6 +150,12 @@ export default function QuizList() {
   const [cardError, setCardError] = useState<{ quizId: string; message: string; fixHref?: string } | null>(null)
   // Quiz cuya fila muestra la confirmación de borrado.
   const [confirming, setConfirming] = useState<string | null>(null)
+  // Fila cuya confirmación se canceló: su "Borrar" recupera el foco.
+  const [cancelledRemove, setCancelledRemove] = useState<string | null>(null)
+  const cancelRemove = () => {
+    setCancelledRemove(confirming)
+    setConfirming(null)
+  }
   const router = useRouter()
 
   const [live, setLive] = useState<LiveState>({ status: 'loading' })
@@ -221,7 +231,11 @@ export default function QuizList() {
 
       <LiveGames live={live} onRetry={retryLive} />
 
-      <h2 className="text-[2em]">Quizzes</h2>
+      <div className="flex flex-col gap-1">
+        <h2 className="text-[2em]">Quizzes</h2>
+        {/* La notebook a veces se duplica en el proyector: que nadie se sorprenda al lanzar. */}
+        {list.status === 'ready' && list.quizzes.length > 0 && <p className="text-muted">Al lanzar, esta pantalla pasa a la sala de espera con el código QR para que se sumen los jugadores.</p>}
+      </div>
 
       {list.status === 'loading' && <p className="text-muted" role="status">Cargando quizzes…</p>}
 
@@ -240,7 +254,7 @@ export default function QuizList() {
       )}
 
       {list.status === 'ready' && list.quizzes.length > 0 && (
-        <ul className="divide-y divide-bg overflow-hidden rounded-card bg-surface">
+        <ul className="flex flex-col gap-2">
           {list.quizzes.map((q) => {
             const launching = busy?.quizId === q.id && busy.action === 'launch'
             const removing = busy?.quizId === q.id && busy.action === 'remove'
@@ -248,7 +262,7 @@ export default function QuizList() {
             const metaId = `quiz-meta-${q.id}`
             const empty = questionCount(q) === 0
             return (
-              <li key={q.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:gap-6" aria-busy={launching || removing}>
+              <li key={q.id} className="flex flex-col gap-3 rounded-card bg-surface p-5 sm:flex-row sm:items-center sm:gap-6" aria-busy={launching || removing}>
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <strong id={titleId} className="text-[1.125rem] break-words">{q.title}</strong>
                   {empty ? (
@@ -260,19 +274,22 @@ export default function QuizList() {
                     <p id={metaId} className="text-muted">{quizMeta(q)}</p>
                   )}
                   {confirming === q.id ? (
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1"
-                      onKeyDown={(e) => e.key === 'Escape' && setConfirming(null)}>
-                      <span>¿Borrar este quiz y sus preguntas?</span>
-                      <button className={DANGER} onClick={() => remove(q)} aria-describedby={titleId}>Sí, borrar</button>
-                      <button className={QUIET} onClick={() => setConfirming(null)} autoFocus>Cancelar</button>
+                    <div key="confirm" className="flex flex-wrap items-center gap-x-4 gap-y-2"
+                      onKeyDown={(e) => e.key === 'Escape' && cancelRemove()}>
+                      <span>
+                        ¿Borrar este quiz<span className="sr-only"> «{q.title}»</span> y sus preguntas? No se puede deshacer.
+                      </span>
+                      <button className={DANGER} onClick={() => remove(q)} aria-describedby={titleId}>Borrar quiz</button>
+                      <button className={QUIET} onClick={cancelRemove} autoFocus>Cancelar</button>
                     </div>
                   ) : (
-                    <div className="-ml-1 flex gap-4">
+                    <div key="actions" className="-ml-1 flex gap-4">
                       <Link className={`${QUIET} ${busy ? 'pointer-events-none opacity-50' : ''}`}
                         href={`/quiz/${q.id}`} aria-describedby={titleId} aria-disabled={!!busy} tabIndex={busy ? -1 : undefined}>
                         Editar
                       </Link>
-                      <button className={`${QUIET} hover:text-bad`} disabled={!!busy} aria-describedby={titleId} onClick={() => askRemove(q.id)}>
+                      <button className={`${QUIET} hover:text-bad`} disabled={!!busy} aria-describedby={titleId}
+                        autoFocus={cancelledRemove === q.id} onClick={() => askRemove(q.id)}>
                         {removing ? 'Borrando…' : 'Borrar'}
                       </button>
                     </div>
@@ -287,7 +304,7 @@ export default function QuizList() {
                     </p>
                   )}
                 </div>
-                <button className="btn shrink-0" disabled={!!busy || empty} aria-describedby={`${titleId} ${metaId}`} onClick={() => launch(q.id)}>
+                <button className="btn-outline shrink-0" disabled={!!busy || empty} aria-describedby={`${titleId} ${metaId}`} onClick={() => launch(q.id)}>
                   {launching ? 'Abriendo sala…' : 'Lanzar en vivo'}
                 </button>
               </li>
