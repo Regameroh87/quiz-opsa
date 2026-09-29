@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
 
 export type Phase = 'lobby' | 'question' | 'reveal' | 'leaderboard' | 'finished'
@@ -111,11 +111,10 @@ export function useQuestion(game: Game | null) {
   const pos = game?.current_position
   const code = game?.code
 
+  const active = !!code && !!phase && phase !== 'lobby' && phase !== 'finished'
+
   useEffect(() => {
-    if (!code || !phase || phase === 'lobby' || phase === 'finished') {
-      setQ(null)
-      return
-    }
+    if (!active) return
     let cancelled = false
     rpc<CurrentQuestion>('get_current_question', { p_code: code })
       .then((data) => !cancelled && setQ({ data, receivedAt: Date.now() }))
@@ -123,15 +122,15 @@ export function useQuestion(game: Game | null) {
     return () => {
       cancelled = true
     }
-  }, [code, phase, pos])
+  }, [active, code, phase, pos])
 
   // Hasta que llega la pregunta nueva no se expone la anterior (su tiempo ya venció y dispararía el reveal).
-  return q && q.data.index === pos ? q : null
+  return active && q && q.data.index === pos ? q : null
 }
 
 /** Segundos restantes, corrigiendo el desfase entre el reloj del celular y el del servidor. */
 export function useRemaining(q: ReturnType<typeof useQuestion>) {
-  const [now, setNow] = useState(Date.now())
+  const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 200)
     return () => clearInterval(t)
@@ -144,6 +143,7 @@ export function useRemaining(q: ReturnType<typeof useQuestion>) {
 
 export function useLatest<T>(value: T) {
   const ref = useRef(value)
-  ref.current = value
+  // Antes que los efectos normales, para que lean el valor del mismo render.
+  useLayoutEffect(() => { ref.current = value })
   return ref
 }

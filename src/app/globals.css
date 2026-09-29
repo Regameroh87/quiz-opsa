@@ -1,0 +1,41 @@
+@import 'tailwindcss';
+
+/* Identidad visual New Holland (tomada de la Guía FieldOps). */
+@theme {
+  --color-bg: #00153f;
+  --color-surface: #00205b;
+  --color-text: #ffffff;
+  --color-muted: #b7c2dc;
+  --color-brand: #f1b514;
+  --color-brand-contrast: #000000;
+  --color-good: #34d399;
+  --color-bad: #ff6b6b;
+  /* Opciones de respuesta: texto blanco con contraste AA */
+  --color-opt-0: #c9302c;
+  --color-opt-1: #2f6fe0;
+  --color-opt-2: #b45309;
+  --color-opt-3: #15803d;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --radius-card: 14px;
+}
+
+@layer base {
+  body { @apply min-h-dvh bg-bg font-sans text-text; }
+  button:not(:disabled) { @apply cursor-pointer; }
+  button:disabled { @apply cursor-not-allowed opacity-50; }
+  :focus-visible { @apply outline-3 outline-offset-2 outline-brand; }
+  /* Tamaños de título como los del navegador (preflight los resetea). */
+  h1 { @apply text-[2em] font-bold; }
+  h2 { @apply text-[1.5em] font-bold; }
+}
+
+/* Primitivas repetidas en todas las pantallas. */
+@layer components {
+  .page { @apply mx-auto flex min-h-dvh max-w-[560px] flex-col gap-4 px-4 py-6; }
+  .card { @apply flex flex-col gap-3 rounded-card bg-surface p-5; }
+  .input { @apply w-full rounded-[10px] border-2 border-transparent bg-bg p-3.5 text-text focus:border-brand focus:outline-none; }
+  .btn { @apply rounded-[10px] bg-brand px-5 py-3.5 text-center font-bold text-brand-contrast; }
+  .btn-secondary { @apply rounded-[10px] border-2 border-muted bg-transparent px-5 py-3.5 text-center font-bold text-text; }
+  .badge { @apply rounded-full bg-surface px-3 py-1 font-semibold text-muted; }
+  .timer { @apply text-[2.4rem] font-extrabold tabular-nums; }
+}
