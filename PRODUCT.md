@@ -8,7 +8,7 @@ web
 
 ## Users
 
-- **Players:** customers of an official New Holland dealership (OPSA) attending customer events. They join from their own phones by scanning a QR code or typing a 6-character code, choose a nickname, and answer timed multiple-choice questions. They don't have accounts; the session is anonymous and survives a reload.
+- **Players:** customers of OPSA (Oscar Pourtau S.A.), an official New Holland dealership, attending customer events. They join from their own phones by scanning a QR code or typing a 6-character code, choose a nickname, and answer timed multiple-choice questions. They don't have accounts; the session is anonymous and survives a reload.
 - **Admins/hosts:** several people on the dealership's team. Each one creates quizzes, starts games, and runs them from a computer connected to the event's shared screen.
 
 ## Product Purpose
@@ -30,7 +30,7 @@ A live quiz game in the style of Kahoot for dealership customer events: a host r
 
 ## Brand Commitments
 
-- The visible brand is **New Holland**, presented by the OPSA dealership. The logo is in `public/logo-new-holland.png`, and the current palette comes from New Holland's "Guía FieldOps" guide (see `src/app/globals.css`).
+- The visible brand is **New Holland**, presented by the OPSA dealership (Oscar Pourtau S.A.; the logo lockup reads "OSCAR POURTAU"). The logo is in `public/logo-new-holland.png`, and the current palette comes from New Holland's "Guía FieldOps" guide (see `src/app/globals.css`).
 - The interface is in Spanish, using rioplatense *voseo* ("elegí", "tenés", "sumate").
 
 ## Evidence on Hand
