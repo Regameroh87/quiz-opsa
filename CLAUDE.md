@@ -19,7 +19,7 @@ Database: schema lives in `supabase/migrations/` (apply as new numbered migratio
 
 ## Architecture
 
-**All pages are client components talking directly to Supabase** — no API routes, server actions, or server-side Supabase client. `/` just redirects to `/admin`.
+**All pages are client components talking directly to Supabase** — no API routes, server actions, or server-side Supabase client.
 
 **Security model lives in Postgres, not in the app.** Read `supabase/migrations/0001_init.sql` before changing any game logic:
 - Players sign in anonymously (`ensureSession()` in `src/lib/supabase.ts`); admins use email/password and must have a row in `admins` (`is_admin()`).
@@ -36,7 +36,7 @@ Database: schema lives in `supabase/migrations/` (apply as new numbered migratio
 - `useRemaining` corrects client clock skew using `server_now` from the RPC.
 - `players`, `answers`, `games` are in the `supabase_realtime` publication; the host screen (`src/app/host/[gameId]/page.tsx`) subscribes to player joins and answer inserts, and auto-reveals once per question when time runs out or everyone answered.
 
-**Routes:** `/admin` (auth-gated by `admin/layout.tsx`; quiz list + "start game") → `/admin/quiz/[id]` (editor, `new` for create) → `/host/[gameId]` (projector view, QR lobby) ; `/play?code=XXXXXX` (player join + game, reconnects via `get_my_standing`).
+**Routes:** the admin lives in the `(admin)` route group so its auth gate (`(admin)/layout.tsx`) doesn't wrap `/play` or `/host`: `/` (quiz list + "start game") → `/quiz/[id]` (editor, `new` for create) → `/host/[gameId]` (projector view, QR lobby); `/play?code=XXXXXX` (player join + game, reconnects via `get_my_standing`).
 
 **Styling:** Tailwind v4 configured in CSS (`src/app/globals.css`): New Holland brand colors in `@theme`, and shared primitives (`.page`, `.card`, `.btn`, `.btn-secondary`, `.input`, `.badge`, `.timer`) in `@layer components`. The host screen scales everything in `em` from a viewport-based base font size so it fits any projector.
 

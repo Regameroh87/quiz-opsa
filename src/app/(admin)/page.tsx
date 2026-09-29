@@ -40,7 +40,7 @@ export default function QuizList() {
     <main className="page">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="min-w-0 flex-1">Quizzes</h1>
-        <Link className="btn" href="/admin/quiz/new">Nuevo quiz</Link>
+        <Link className="btn" href="/quiz/new">Nuevo quiz</Link>
       </div>
       {error && <p className="text-bad" role="alert">{error}</p>}
       {quizzes?.length === 0 && <p className="text-muted">Todavía no hay quizzes. Creá el primero.</p>}
@@ -49,7 +49,7 @@ export default function QuizList() {
           <strong>{q.title}</strong>
           <div className="flex flex-wrap items-center gap-2">
             <button className="btn" onClick={() => launch(q.id)}>Lanzar en vivo</button>
-            <Link className="btn-secondary" href={`/admin/quiz/${q.id}`}>Editar</Link>
+            <Link className="btn-secondary" href={`/quiz/${q.id}`}>Editar</Link>
             <button className="btn-secondary" onClick={() => remove(q)}>Borrar</button>
           </div>
         </div>

@@ -67,7 +67,7 @@ export default function QuizEditor() {
       const { error: de } = await supabase.from('questions').delete().eq('quiz_id', quizId)
         .not('id', 'in', `(${rows.map((r) => r.id).join(',')})`)
       if (de) throw de
-      router.push('/admin')
+      router.push('/')
     } catch {
       setError('No se pudo guardar. Intentá de nuevo.')
       setSaving(false)
@@ -78,7 +78,7 @@ export default function QuizEditor() {
 
   return (
     <form className="page" onSubmit={save}>
-      <div><Link href="/admin" className="text-muted">← Volver</Link></div>
+      <div><Link href="/" className="text-muted">← Volver</Link></div>
       <input className="input" placeholder="Título del quiz" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} required />
 
       {questions.map((q, i) => (
