@@ -12,6 +12,7 @@ import Logo from '@/components/Logo'
 const SCREEN = 'flex min-h-dvh flex-col gap-[2vw] p-[3vw] text-[clamp(16px,1.6vw,28px)] [&_h1]:text-[3.2em] [&_h1]:leading-[1.1]'
 const BTN = 'px-[1.6em] py-[0.7em] text-[1.1em]'
 const ACTIONS = 'mt-auto flex justify-end gap-[1em]'
+const REVEAL_LOCK_S = 2
 const PODIUM = ['min-h-[14em] bg-brand', 'min-h-[10em] bg-surface', 'min-h-[7em] bg-surface']
 const CHIP = 'rounded-full bg-surface px-[0.9em] py-[0.4em]'
 
@@ -35,15 +36,23 @@ export default function Host() {
   const currentQuestionId = useLatest(questionId)
   const answered = answeredFor && answeredFor.questionId === questionId ? answeredFor.n : 0
 
+  // Mientras corre un paso, los botones de avance se deshabilitan: un doble clic no debe avanzar dos veces.
+  const [advancing, setAdvancing] = useState(false)
   const advance = async (action: string) => {
     setActionError('')
+    setAdvancing(true)
     try {
       // Se aplica la respuesta directo, sin esperar el aviso de Realtime.
       setGame(await rpc<Game>('host_advance', { p_game_id: gameId, p_action: action }))
     } catch (e) {
       setActionError(errorMessage(e))
+    } finally {
+      setAdvancing(false)
     }
   }
+  // "Revelar ya" no acepta clics en los primeros segundos: un clic de más en "Empezar"/"Siguiente"
+  // no puede cerrar la pregunta que se acaba de abrir.
+  const justOpened = !!q && remaining !== null && remaining > q.data.time_limit_s - REVEAL_LOCK_S
 
   // Jugadores en vivo
   useEffect(() => {
@@ -105,7 +114,7 @@ export default function Host() {
   return (
     <div className={SCREEN}>
       <Logo height={48} />
-      {phase === 'lobby' && <Lobby code={game.code} players={players} onStart={() => advance('start')} />}
+      {phase === 'lobby' && <Lobby code={game.code} players={players} starting={advancing} onStart={() => advance('start')} />}
 
       {(phase === 'question' || phase === 'reveal') && q && (
         <>
@@ -129,11 +138,16 @@ export default function Host() {
             ))}
           </OptionGrid>
           <div className={ACTIONS}>
-            {phase === 'question' && <button className={`btn-secondary ${BTN}`} onClick={() => advance('reveal')}>Revelar ya</button>}
+            {/* A la izquierda: lejos del lugar donde estaban "Empezar" y "Siguiente pregunta". */}
+            {phase === 'question' && (
+              <button className={`btn-secondary mr-auto ${BTN}`} disabled={advancing || justOpened} onClick={() => advance('reveal')}>
+                Revelar ya
+              </button>
+            )}
             {phase === 'reveal' && (
               <>
-                <button className={`btn-secondary ${BTN}`} onClick={() => advance('leaderboard')}>Ver ranking</button>
-                <button className={`btn ${BTN}`} onClick={() => advance('next')}>
+                <button className={`btn-secondary ${BTN}`} disabled={advancing} onClick={() => advance('leaderboard')}>Ver ranking</button>
+                <button className={`btn ${BTN}`} disabled={advancing} onClick={() => advance('next')}>
                   {q.data.index + 1 >= q.data.total ? 'Ver resultado final' : 'Siguiente pregunta'}
                 </button>
               </>
@@ -154,7 +168,7 @@ export default function Host() {
               </li>
             ))}
           </ol>
-          <div className={ACTIONS}><button className={`btn ${BTN}`} onClick={() => advance('next')}>Siguiente</button></div>
+          <div className={ACTIONS}><button className={`btn ${BTN}`} disabled={advancing} onClick={() => advance('next')}>Siguiente</button></div>
         </>
       )}
 
@@ -174,16 +188,17 @@ export default function Host() {
       )}
 
       {actionError && <p className="text-bad" role="alert">{actionError}</p>}
-      {phase !== 'finished' && phase !== 'lobby' && (
+      {/* Recién con la pregunta en pantalla: mientras carga, este lugar es donde estaba "Empezar". */}
+      {(phase === 'leaderboard' || ((phase === 'question' || phase === 'reveal') && q)) && (
         <div className="flex justify-end gap-[1em]">
-          <button className={`btn-secondary ${BTN}`} onClick={() => confirm('¿Terminar el quiz ahora?') && advance('finish')}>Terminar</button>
+          <button className={`btn-secondary ${BTN}`} disabled={advancing} onClick={() => confirm('¿Terminar el quiz ahora?') && advance('finish')}>Terminar</button>
         </div>
       )}
     </div>
   )
 }
 
-function Lobby({ code, players, onStart }: { code: string; players: string[]; onStart: () => void }) {
+function Lobby({ code, players, starting, onStart }: { code: string; players: string[]; starting: boolean; onStart: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const url = `${location.origin}/play?code=${code}`
 
@@ -204,7 +219,9 @@ function Lobby({ code, players, onStart }: { code: string; players: string[]; on
         </div>
       </div>
       <div className={ACTIONS}>
-        <button className={`btn ${BTN}`} disabled={players.length === 0} onClick={onStart}>Empezar</button>
+        <button className={`btn ${BTN}`} disabled={players.length === 0 || starting} onClick={onStart}>
+          {starting ? 'Empezando…' : 'Empezar'}
+        </button>
       </div>
     </>
   )
