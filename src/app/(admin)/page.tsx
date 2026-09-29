@@ -269,14 +269,13 @@ export default function QuizList() {
     setBusy({ quizId: q.id, action: 'remove' })
     const { error } = await supabase.from('quizzes').delete().eq('id', q.id)
     setBusy(null)
-    if (!error) return void load()
-    // games.quiz_id es on delete restrict: un quiz ya jugado no se puede borrar (23503 = foreign_key_violation).
-    setCardError({
-      quizId: q.id,
-      message: error.code === '23503'
-        ? 'No se puede borrar un quiz que ya se usó en una partida.'
-        : 'No se pudo borrar. Revisá tu conexión e intentá de nuevo.',
-    })
+    if (error) {
+      setCardError({ quizId: q.id, message: 'No se pudo borrar. Revisá tu conexión e intentá de nuevo.' })
+      return
+    }
+    // Borrar el quiz se lleva sus partidas (on delete cascade): también se refresca la franja de partidas en curso.
+    void load()
+    void fetchLiveGames().then(setLive)
   }
 
   return (
@@ -334,7 +333,10 @@ export default function QuizList() {
                     <div key="confirm" className="flex flex-wrap items-center gap-x-4 gap-y-2"
                       onKeyDown={(e) => e.key === 'Escape' && cancelRemove()}>
                       <span>
-                        ¿Borrar este quiz<span className="sr-only"> «{q.title}»</span> y sus preguntas? No se puede deshacer.
+                        {openGameByQuiz.has(q.id)
+                          ? <>Tiene una partida en curso: si lo borrás, la sala se corta. ¿Borrar igual<span className="sr-only"> «{q.title}»</span>? </>
+                          : <>¿Borrar este quiz<span className="sr-only"> «{q.title}»</span> con sus preguntas y partidas? </>}
+                        No se puede deshacer.
                       </span>
                       <button className={DANGER} onClick={() => remove(q)} aria-describedby={titleId}>Borrar quiz</button>
                       <button className={QUIET} onClick={cancelRemove} autoFocus>Cancelar</button>
