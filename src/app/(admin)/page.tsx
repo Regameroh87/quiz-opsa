@@ -7,6 +7,7 @@ import { authHeader, liveChannel, supabase } from '@/lib/supabase'
 import { errorMessage, QUIZ_LIMIT, rpc, type Game, type Phase } from '@/lib/game'
 import Logo from '@/components/Logo'
 import AccountMenu from '@/components/AccountMenu'
+import RowMenu, { MENU_ITEM } from '@/components/RowMenu'
 import PageTransition from '@/components/PageTransition'
 import { deleteQuestionImages } from '@/lib/image'
 
@@ -110,7 +111,7 @@ function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () 
   if (live.status === 'loading') return null
   if (live.status === 'error') {
     return (
-      <p className="text-ink-soft" role="status">
+      <p className="text-white" role="status">
         No pudimos ver si tenés partidas en curso.{' '}
         <button className="font-semibold text-white underline underline-offset-4"
           onClick={onRetry}>
@@ -124,7 +125,7 @@ function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () 
   return (
     <section aria-labelledby="live-heading" className="flex flex-col gap-3">
       <h2 id="live-heading" className="flex items-center gap-2.5 font-display text-2xl text-white">
-        <span aria-hidden className="size-3.5 animate-pulse rounded-full bg-alert ring-4 ring-white" />
+        <span aria-hidden className="size-3.5 rounded-full bg-white ring-4 ring-white/40 motion-safe:animate-pulse" />
         {live.games.length === 1 ? 'Partida en curso' : 'Partidas en curso'}
       </h2>
       <ul className="flex flex-col gap-3">
@@ -135,8 +136,8 @@ function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () 
             <li key={g.id} className="sticker-panel flex flex-col gap-3 border-brand p-5 sm:flex-row sm:items-center sm:gap-6"
               aria-busy={finishing === g.id}>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <strong id={titleId} className="text-[1.2rem] break-words">{g.quizzes?.title ?? 'Quiz'}</strong>
-                <span id={phaseId} className="text-ink-soft">{phaseLabel(g)}</span>
+                <strong id={titleId} className="text-lg break-words">{g.quizzes?.title ?? 'Quiz'}</strong>
+                <span id={phaseId} className="text-ink-soft" aria-live="polite">{phaseLabel(g)}</span>
                 {confirming === g.id ? (
                   <div key="confirm" className="flex flex-wrap items-center gap-x-4 gap-y-2"
                     onKeyDown={(e) => e.key === 'Escape' && cancel()}>
@@ -193,7 +194,7 @@ function AdminHeader({ liveCount, quizCount }: { liveCount: number; quizCount: n
         <div className="ml-auto flex items-center gap-3">
           {/* Un usuario común ve solo sus quizzes, así que la cantidad de la lista es la suya. */}
           {role === 'user' && quizCount >= QUIZ_LIMIT
-            ? <span className="text-ink-soft">Límite de {QUIZ_LIMIT} quizzes</span>
+            ? <span className="text-white">Límite de {QUIZ_LIMIT} quizzes: borrá uno para crear otro</span>
             : <Link className="sticker-btn-ghost sticker-btn-sm" href="/quiz/new" transitionTypes={['nav-forward']}>Nuevo quiz</Link>}
           {/* Salir con una partida abierta corta la pantalla del host: se confirma primero. */}
           <AccountMenu key={cancelled ? 'returned' : 'initial'} autoFocus={cancelled} email={email} isAdmin={role === 'admin'}
@@ -234,15 +235,21 @@ function quizMeta(q: Quiz) {
 // Referencia estable: enfoca solo al aparecer, no en cada render.
 const focusOnMount = (el: HTMLElement | null) => el?.focus()
 
+// La explicación de cómo se lanza se muestra hasta el primer lanzamiento de esta notebook. Es una comodidad
+// del navegador, no un dato: si el storage no anda, simplemente se sigue mostrando.
+const LAUNCHED_KEY = 'quiz-opsa:launched'
+const hasLaunched = () => {
+  try { return !!localStorage.getItem(LAUNCHED_KEY) } catch { return false }
+}
+
 // Acción en curso sobre un quiz: mientras dura, se bloquean todas las acciones de la lista.
 type Busy = { quizId: string; action: 'launch' | 'remove' } | null
 
 // Acciones secundarias de cada fila: discretas, para que "Lanzar en vivo" sea lo único que resalte.
 const QUIET = 'quiet-link'
+// Aviso corto sobre el campo: va en un sticker navy, así el texto secundario no depende del resplandor del fondo.
+const NOTE = 'max-w-[60ch] self-start rounded-xl border-[3px] border-white bg-navy px-3 py-2 text-ink-soft'
 const DANGER = 'sticker-btn-danger'
-
-// Cada fila es un sticker pegado con su propio giro, alternado para que la grilla respire.
-const TILTS = ['-0.8deg', '0.6deg', '-0.4deg', '0.9deg']
 
 // Pegatina del estado vacío, la misma mascota del login.
 function EmptyMascot() {
@@ -275,6 +282,9 @@ function QuizList() {
   const router = useRouter()
 
   const [live, setLive] = useState<LiveState>({ status: 'loading' })
+  // Un refresco en segundo plano falló: lo que se ve es el último dato bueno y puede estar viejo.
+  const [stale, setStale] = useState(false)
+  const [showHint] = useState(() => !hasLaunched())
   // Dueños de los quizzes ajenos (solo los ve un admin); sin mail se muestra «otro socio».
   const [owners, setOwners] = useState<Map<string, string>>(new Map())
 
@@ -292,8 +302,11 @@ function QuizList() {
       // Una ráfaga de cambios (p. ej. muchos jugadores sumándose) dispara una sola recarga.
       clearTimeout(timer)
       timer = setTimeout(() => {
-        void fetchQuizzes().then((s) => s.status === 'ready' && setList(s))
-        void fetchLiveGames().then((s) => s.status === 'ready' && setLive(s))
+        void Promise.all([fetchQuizzes(), fetchLiveGames()]).then(([quizzes, games]) => {
+          if (quizzes.status === 'ready') setList(quizzes)
+          if (games.status === 'ready') setLive(games)
+          setStale(quizzes.status !== 'ready' || games.status !== 'ready')
+        })
       }, 400)
     }
     const ch = liveChannel('admin-panel')
@@ -326,6 +339,12 @@ function QuizList() {
   // Quiz con una partida abierta: su botón vuelve a esa sala en vez de crear otra.
   const openGameByQuiz = new Map(live.status === 'ready' ? live.games.map((g) => [g.quiz_id, g.id]) : [])
   const podium = live.status === 'ready' ? live.podium : null
+  // Un solo amarillo por vista: con una partida en curso lo tiene su "Controlar"; si no, el quiz propio
+  // más reciente que se pueda lanzar (la lista ya viene de más nuevo a más viejo).
+  const featuredQuiz = live.status === 'ready' && live.games.length === 0
+    ? mine.find((q) => questionCount(q) > 0)
+    : undefined
+  const featuredId = featuredQuiz?.id
 
   // Sin volver a 'loading': reintentar no debe esconder la lista de quizzes.
   const retryLive = () => void fetchLiveGames().then(setLive)
@@ -350,6 +369,7 @@ function QuizList() {
       // La sala va a la pestaña nueva, que es la que se lleva al proyector; esta pasa al control.
       // Si el navegador bloqueó la pestaña, el control ofrece abrir el proyector.
       if (tab) tab.location.href = `/host/${game.id}`
+      try { localStorage.setItem(LAUNCHED_KEY, '1') } catch { /* sin storage: la explicación sigue apareciendo */ }
       // Se mantiene bloqueado hasta que carga el control, para no crear otra partida.
       router.push(`/control/${game.id}`, { transitionTypes: ['nav-forward'] })
     } catch (e) {
@@ -387,20 +407,30 @@ function QuizList() {
     void fetchLiveGames().then(setLive)
   }
 
-  const renderCard = (q: Quiz, i: number) => {
+  // Un solo sticker con una fila por quiz: con muchos quizzes se escanea en vez de recorrer tarjetas.
+  const library = (quizzes: Quiz[]) => quizzes.length > 0 && (
+    <ul className="sticker-panel flex flex-col divide-y divide-ink-soft/25">
+      {quizzes.map((q) => renderCard(q))}
+    </ul>
+  )
+
+  // featured: el quiz que lleva el amarillo, como sticker propio; el resto va en las filas de library().
+  const renderCard = (q: Quiz, featured = false) => {
     const launching = busy?.quizId === q.id && busy.action === 'launch'
     const removing = busy?.quizId === q.id && busy.action === 'remove'
     const titleId = `quiz-${q.id}`
     const metaId = `quiz-meta-${q.id}`
     const empty = questionCount(q) === 0
     return (
-      <li key={q.id} className="sticker-panel flex flex-col gap-4 p-6" style={{ '--tilt': TILTS[i % TILTS.length] } as React.CSSProperties} aria-busy={launching || removing}>
+      <li key={q.id} aria-busy={launching || removing}
+        className={featured ? 'sticker-panel flex flex-col gap-4 p-6 md:flex-row md:items-center md:gap-8' : 'flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:gap-6'}
+        style={featured ? { '--tilt': '-0.6deg' } as React.CSSProperties : undefined}>
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <strong id={titleId} className="text-[1.35rem] leading-snug break-words">{q.title}</strong>
+          <strong id={titleId} className={`${featured ? 'text-[1.35rem]' : 'text-lg'} leading-snug break-words`}>{q.title}</strong>
           {empty ? (
             <p id={metaId} className="text-ink-soft">
               Sin preguntas todavía.{' '}
-              <Link className="font-semibold text-brand underline underline-offset-4" href={`/quiz/${q.id}`} transitionTypes={['nav-forward']}>Agregá preguntas</Link>
+              <Link className="font-semibold text-white underline underline-offset-4" href={`/quiz/${q.id}`} transitionTypes={['nav-forward']}>Agregá preguntas</Link>
             </p>
           ) : (
             <p id={metaId} className="text-ink-soft">{quizMeta(q)}</p>
@@ -420,18 +450,7 @@ function QuizList() {
               <button className={DANGER} onClick={() => remove(q)} aria-describedby={titleId}>Borrar quiz</button>
               <button className={QUIET} onClick={cancelRemove} autoFocus>Cancelar</button>
             </div>
-          ) : (
-            <div key="actions" className="-ml-1 flex gap-4">
-              <Link className={`${QUIET} ${busy ? 'pointer-events-none opacity-50' : ''}`}
-                href={`/quiz/${q.id}`} aria-describedby={titleId} aria-disabled={!!busy} tabIndex={busy ? -1 : undefined}>
-                Editar
-              </Link>
-              <button className={QUIET} disabled={!!busy} aria-describedby={titleId}
-                autoFocus={cancelledRemove === q.id} onClick={() => askRemove(q.id)}>
-                {removing ? 'Borrando…' : 'Borrar'}
-              </button>
-            </div>
-          )}
+          ) : null}
           {cardError?.quizId === q.id && (
             // Recibe el foco: el botón que lo disparó queda deshabilitado mientras corre la acción.
             <p className="sticker-note" role="alert" tabIndex={-1} ref={focusOnMount}>
@@ -442,15 +461,29 @@ function QuizList() {
             </p>
           )}
         </div>
-        {openGameByQuiz.has(q.id) ? (
-          <Link className="sticker-btn-ghost sticker-btn-sm self-start" href={`/control/${openGameByQuiz.get(q.id)}`} transitionTypes={['nav-forward']} aria-describedby={titleId}>
-            Controlar partida
-          </Link>
-        ) : (
-          <button className="sticker-btn sticker-btn-sm self-start" disabled={!!busy || empty} aria-describedby={`${titleId} ${metaId}`} onClick={() => launch(q.id)}>
-            {launching ? 'Abriendo sala…' : 'Lanzar en vivo'}
-          </button>
-        )}
+        <div className="flex items-center gap-3 sm:shrink-0">
+          {openGameByQuiz.has(q.id) ? (
+            // El "Controlar" de esta partida está arriba, en la franja: acá solo se señala para no duplicarlo.
+            <a className={QUIET} href="#live-heading" aria-describedby={titleId}>Partida en curso, arriba</a>
+          ) : (
+            <button className={`${q.id === featuredId ? 'sticker-btn' : 'sticker-btn-ghost'} sticker-btn-sm`} disabled={!!busy || empty} aria-describedby={`${titleId} ${metaId}`} onClick={() => launch(q.id)}>
+              {launching ? (podium ? 'Enviando…' : 'Abriendo sala…') : podium ? 'Lanzar en el proyector' : 'Lanzar en vivo'}
+            </button>
+          )}
+          {/* Editar y Borrar van aparte: Borrar no queda a un toque de la acción principal. */}
+          {confirming !== q.id && (removing
+            ? <span className="text-ink-soft" role="status">Borrando…</span>
+            : (
+              <RowMenu label={`Más acciones de «${q.title}»`} disabled={!!busy} autoFocus={cancelledRemove === q.id}>
+                {(close) => (
+                  <>
+                    <Link className={MENU_ITEM} href={`/quiz/${q.id}`} transitionTypes={['nav-forward']} onClick={close}>Editar</Link>
+                    <button type="button" className={`${MENU_ITEM} hover:bg-alert!`} onClick={() => { close(); askRemove(q.id) }}>Borrar</button>
+                  </>
+                )}
+              </RowMenu>
+            ))}
+        </div>
       </li>
     )
   }
@@ -465,15 +498,36 @@ function QuizList() {
 
       <LiveGames live={live} onRetry={retryLive} onChanged={() => void fetchLiveGames().then(setLive)} />
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <h2 className="font-display text-[clamp(2.4rem,5vw,3.4rem)] leading-none text-brand">Tus quizzes</h2>
-        {/* La notebook a veces se duplica en el proyector: que nadie se sorprenda al lanzar. */}
-        {listReady && list.status === 'ready' && list.quizzes.length > 0 && <p className="max-w-[60ch] text-ink-soft">{podium
-          ? 'Tu proyector quedó en el podio: al lanzar, el quiz nuevo aparece en esa misma pantalla con su QR, y esta pasa al control. Si cerraste el proyector, abrilo desde el control.'
-          : 'Al lanzar, la sala de espera con el código QR se abre en otra pestaña para el proyector, y esta pasa al control de la partida. El control también se usa desde el celular: entrá al panel y tocá «Controlar».'}</p>}
+        {/* Con el proyector parado en el podio, "Lanzar" cambia de comportamiento: se dice donde se decide. */}
+        {live.status === 'ready' && podium && (
+          <p className={NOTE} role="status">
+            Proyector esperando: el próximo quiz aparece en esa pantalla con su QR. Si lo cerraste, abrilo desde el control.
+          </p>
+        )}
+        {live.status === 'ready' && !podium && showHint && list.status === 'ready' && list.quizzes.length > 0 && (
+          <p className={NOTE}>
+            Al lanzar, la sala con el QR se abre en otra pestaña para el proyector y esta pasa al control. Desde el celular, entrá al panel y tocá «Controlar».
+          </p>
+        )}
       </div>
 
-      {!listReady && <p className="font-display text-2xl text-white" role="status">Cargando quizzes…</p>}
+      {stale && <p className="sticker-note" role="status">Sin conexión: lo que ves puede estar desactualizado.</p>}
+
+      {!listReady && (
+        <div role="status">
+          <span className="sr-only">Cargando quizzes…</span>
+          <ul aria-hidden className="sticker-panel flex flex-col divide-y divide-ink-soft/25 motion-safe:animate-pulse">
+            {[0, 1, 2].map((n) => (
+              <li key={n} className="flex flex-col gap-2 px-5 py-4">
+                <span className="h-5 w-2/5 rounded-full bg-white/20" />
+                <span className="h-4 w-1/4 rounded-full bg-white/10" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {listReady && list.status === 'error' && (
         <div className="sticker-panel flex flex-col items-start gap-4 p-6" role="alert">
@@ -494,24 +548,19 @@ function QuizList() {
       )}
 
       {listReady && list.status === 'ready' && list.quizzes.length > 0 && mine.length === 0 && (
-        <p className="text-ink-soft">
+        <p className="text-white">
           Todavía no armaste quizzes propios.{' '}
-          <Link className="font-semibold text-brand underline underline-offset-4" href="/quiz/new" transitionTypes={['nav-forward']}>Crear uno</Link>
+          <Link className="font-semibold text-white underline underline-offset-4" href="/quiz/new" transitionTypes={['nav-forward']}>Crear uno</Link>
         </p>
       )}
-      {listReady && mine.length > 0 && (
-        <ul className="grid gap-x-6 gap-y-8 md:grid-cols-2">
-          {mine.map(renderCard)}
-        </ul>
-      )}
+      {listReady && featuredQuiz && <ul>{renderCard(featuredQuiz, true)}</ul>}
+      {listReady && library(mine.filter((q) => q !== featuredQuiz))}
 
       {/* Solo le pasa a un admin: los quizzes de los socios van aparte y con su dueño. */}
       {listReady && others.length > 0 && (
         <section aria-labelledby="others-heading" className="flex flex-col gap-5">
-          <h2 id="others-heading" className="font-display text-[clamp(1.8rem,4vw,2.4rem)] leading-none text-brand">De otros socios</h2>
-          <ul className="grid gap-x-6 gap-y-8 md:grid-cols-2">
-            {others.map(renderCard)}
-          </ul>
+          <h2 id="others-heading" className="font-display text-[clamp(1.8rem,4vw,2.4rem)] leading-none text-white">De otros socios</h2>
+          {library(others)}
         </section>
       )}
     </main>

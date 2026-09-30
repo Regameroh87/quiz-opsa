@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { installPwa, usePwaInstall } from '@/lib/pwa'
-
-const ITEM = 'flex min-h-11 w-full items-center rounded-xl px-3 text-left font-semibold text-white hover:bg-white/10 focus-visible:bg-white/10'
+import { MENU_ITEM as ITEM } from '@/components/RowMenu'
 
 /** Avatar de la cuenta (inicial del mail) con un menú: datos de la sesión, gestión de socios (admin), contraseña, instalar la app y salir. */
 export default function AccountMenu({ email, isAdmin, onSignOut, autoFocus }: {

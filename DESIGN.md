@@ -206,6 +206,12 @@ Gruesos, del ancho completo y con canto: se hunden al apretarlos como un sticker
 - **Ghost (secundario):** relleno blanco troquel, texto navy, canto azul pálido #8fa6d8. Para acciones alternativas ("Entrar con otra cuenta").
 - **Press:** `translate 0 5px` y el canto baja de 7px a 2px, con una transición de 0.08s. Foco: el contorno global de 3px amarillo con 2px de separación. Deshabilitado: opacidad 50% y cursor not-allowed. La etiqueta cambia a gerundio mientras trabaja ("Entrando…").
 
+- **Compacto (`-sm`):** para acciones dentro de listas y encabezados: Rubik 900 a 17px, padding 10px 20px, radio 14px y canto de 5px. El tamaño de 22px queda para las pantallas de una sola acción.
+- **Peligro:** relleno alerta con texto blanco, radio 14px, canto #8f1526 (alerta más oscuro). Solo dentro de confirmaciones de borrado, cierre de partida o cierre de sesión.
+
+### Panel sticker (filas y avisos)
+El sticker fino para contenido en lista: navy, troquel blanco de 6px, radio de 26px, canto `0 10px 0 rgb(0 20 60 / 0.4)` más una sombra suave. Una lista larga va dentro de **un solo** panel, con una fila por ítem separada por divisores ink-soft al 25%, sin giro; el ítem que lleva la acción principal sale como panel propio con giro de -0.6°. Las acciones secundarias de cada fila (editar, borrar) viven en un menú "Más" (`RowMenu`); el aviso corto sobre el campo va en un sticker navy de borde blanco de 3px para no apoyar texto secundario sobre el resplandor.
+
 ### Cards / Containers
 - **Corner Style:** 36px.
 - **Background:** navy, con texto blanco centrado.
