@@ -190,8 +190,9 @@ function Control({ gameId }: { gameId: string }) {
 
       {actionError && <p className="sticker-note" role="alert">{actionError}</p>}
 
-      {/* Próximo paso, pegado abajo: al alcance del pulgar aunque la pregunta sea larga. */}
-      <div className="sticky bottom-0 -mx-4 mt-auto flex flex-col gap-3 bg-gradient-to-t from-field from-75% to-transparent px-4 pt-8 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      {/* Próximo paso, pegado abajo: al alcance del pulgar aunque la pregunta sea larga. En el podio va en el
+          flujo: la lista de "¿Otro quiz?" es lo que hay que ver y una barra pegada la taparía. */}
+      <div className={`${phase === 'finished' ? '' : 'sticky bottom-0 bg-gradient-to-t from-field from-75% to-transparent pt-8 '}-mx-4 mt-auto flex flex-col gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]`}>
         {!closed && <p className="text-xs font-bold tracking-[0.1em] text-ink-soft uppercase">Próximo paso</p>}
 
         {phase === 'lobby' && (
