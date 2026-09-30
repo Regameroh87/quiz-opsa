@@ -151,6 +151,14 @@ function PlayGame({ code }: { code: string }) {
   )
   useEffect(() => { void refreshStanding() }, [refreshStanding, phase, pos])
 
+  // El anfitrión terminó el evento (no sigue otro quiz): despedida con el personaje del jugador.
+  const router = useRouter()
+  const closed = !!game?.closed_at
+  const myAvatar = standing?.avatar
+  useEffect(() => {
+    if (closed) router.replace(`/gracias${myAvatar ? `?avatar=${myAvatar}` : ''}`)
+  }, [closed, myAvatar, router])
+
   const answer = async (i: number) => {
     if (pos === undefined) return
     setChoice({ pos, index: i, error: '' })

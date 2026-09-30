@@ -13,6 +13,8 @@ export interface Game {
   question_started_at: string | null
   // La partida que se lanzó después de esta en el mismo proyector (ver create_next_game).
   next_game_id: string | null
+  // El anfitrión cerró el evento desde el podio: los jugadores pasan a /gracias (ver close_game).
+  closed_at: string | null
 }
 
 export interface CurrentQuestion {

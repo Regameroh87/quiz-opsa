@@ -6,7 +6,7 @@ import QRCode from 'qrcode'
 import { errorMessage, rpc, useGame, useHostLive, useLatest, useQuestion, useRemaining, type Game, type Player } from '@/lib/game'
 import { OptionButton, OptionGrid } from '@/components/OptionButton'
 import Logo from '@/components/Logo'
-import Avatar from '@/components/Avatar'
+import Avatar, { AVATARS } from '@/components/Avatar'
 
 // Pantalla del proyector: todo escala en em a partir del font-size base.
 // Mundo calcomanía: campo azul con las piezas pegadas encima como stickers.
@@ -144,7 +144,23 @@ function Host({ gameId }: { gameId: string }) {
         </>
       )}
 
-      {phase === 'finished' && (
+      {/* Evento cerrado desde el control: despedida con los cuatro personajes. */}
+      {phase === 'finished' && game.closed_at && (
+        <div className="flex flex-1 flex-col items-center justify-center gap-[1.5em] text-center">
+          <h1 className={`${TITLE} text-[5em]`}>¡Gracias por jugar!</h1>
+          <p className="text-[1.6em] font-bold text-ink-soft">¡Nos vemos en el próximo evento!</p>
+          <div className="mt-[1em] flex items-end justify-center gap-[2vw]" aria-hidden>
+            {AVATARS.map((a, i) => (
+              <div key={a.id} className="sticker-tile stick-in relative! w-[11em]" style={{ '--tilt': ['-6deg', '4deg', '-3deg', '6deg'][i], '--delay': `${150 + i * 120}ms` } as React.CSSProperties}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- decorativa */}
+                <img src={a.src} alt="" draggable={false} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {phase === 'finished' && !game.closed_at && (
         <>
           <h1 className={`${TITLE} text-center`}>¡Podio final!</h1>
           <div className="mt-auto flex items-end justify-center gap-[1.5vw]">

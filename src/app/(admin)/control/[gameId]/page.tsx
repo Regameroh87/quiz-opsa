@@ -22,7 +22,7 @@ const SCREEN_NOW: Record<Phase, { title: string; hint: string }> = {
   question: { title: 'Respondiendo', hint: 'Se revela sola cuando se acaba el tiempo o cuando respondieron todos.' },
   reveal: { title: 'Respuesta', hint: 'La pantalla muestra la respuesta correcta y cuántos eligieron cada opción.' },
   leaderboard: { title: 'Ranking', hint: 'La pantalla muestra los 5 primeros.' },
-  finished: { title: 'Podio final', hint: 'La pantalla muestra el podio. La partida terminó.' },
+  finished: { title: 'Podio final', hint: 'La pantalla muestra el podio. Lanzá otro quiz o terminá para despedir a los jugadores.' },
 }
 
 /**
@@ -75,6 +75,20 @@ function Control({ gameId }: { gameId: string }) {
     }
   }
 
+  // Terminar desde el podio: no sigue otro quiz, los jugadores pasan a /gracias.
+  const [closing, setClosing] = useState(false)
+  const close = async () => {
+    setActionError('')
+    setClosing(true)
+    try {
+      setGame(await rpc<Game>('close_game', { p_game_id: gameId }))
+    } catch (e) {
+      setActionError(errorMessage(e))
+    } finally {
+      setClosing(false)
+    }
+  }
+
   if (error) return <Shell><p className="sticker-note" role="alert">{errorMessage(error)}</p></Shell>
   if (!game) return <Shell><p className="font-display text-3xl text-brand" role="status">Cargando…</p></Shell>
 
@@ -86,7 +100,10 @@ function Control({ gameId }: { gameId: string }) {
   const answeredTotal = stats.reduce((a, b) => a + b, 0)
   const correctCount = q?.data.correct_index != null ? stats[q.data.correct_index] ?? 0 : 0
   const inGame = phase === 'question' || phase === 'reveal' || phase === 'leaderboard'
-  const now = SCREEN_NOW[phase]
+  const closed = !!game.closed_at
+  const now = closed
+    ? { title: '¡Gracias por jugar!', hint: 'Terminaste el quiz: la pantalla y los celulares muestran el agradecimiento.' }
+    : SCREEN_NOW[phase]
 
   const nextLabel = last ? 'Ver podio final' : 'Siguiente pregunta'
   const nextHint = last ? 'Termina el quiz y muestra el podio' : `Muestra la pregunta ${current + 1} de ${total}`
@@ -168,13 +185,13 @@ function Control({ gameId }: { gameId: string }) {
         )}
       </section>
 
-      {phase === 'finished' && <NextQuiz game={game} />}
+      {phase === 'finished' && !closed && <NextQuiz game={game} />}
 
       {actionError && <p className="sticker-note" role="alert">{actionError}</p>}
 
       {/* Próximo paso, pegado abajo: al alcance del pulgar aunque la pregunta sea larga. */}
       <div className="sticky bottom-0 -mx-4 mt-auto flex flex-col gap-3 bg-gradient-to-t from-field from-75% to-transparent px-4 pt-8 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        {phase !== 'finished' && <p className="text-xs font-bold tracking-[0.1em] text-ink-soft uppercase">Próximo paso</p>}
+        {!closed && <p className="text-xs font-bold tracking-[0.1em] text-ink-soft uppercase">Próximo paso</p>}
 
         {phase === 'lobby' && (
           <StepButton disabled={players.length === 0 || advancing} onClick={() => advance('start')}
@@ -197,14 +214,20 @@ function Control({ gameId }: { gameId: string }) {
           <StepButton ghost disabled={advancing} onClick={() => advance('leaderboard')}
             label="Mostrar ranking" hint="Antes de seguir, muestra los 5 primeros" />
         )}
-        {phase === 'finished' && <Link className="quiet-link self-center" href="/">Volver al panel</Link>}
+        {phase === 'finished' && !closed && (
+          <StepButton disabled={closing} onClick={close}
+            label={closing ? 'Terminando…' : 'Terminar quiz'} hint="Sin otro quiz: los celulares muestran el agradecimiento" />
+        )}
+        {phase === 'finished' && (
+          <Link className={closed ? 'sticker-btn' : 'quiet-link self-center'} href="/">Volver al panel</Link>
+        )}
 
-        {/* Terminar se confirma en el lugar: corta la partida para todos y no se puede reabrir. */}
+        {/* Saltar al podio se confirma en el lugar: corta las preguntas que faltan y no se puede reabrir. */}
         {confirmingFinish ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-navy p-3" role="alert"
             onKeyDown={(e) => e.key === 'Escape' && setConfirmingFinish(false)}>
-            <p className="min-w-0 flex-1 basis-48 text-sm font-semibold">¿Terminar ahora? La pantalla pasa al podio y no se puede reabrir.</p>
-            <button className="sticker-btn-danger" disabled={advancing} onClick={() => advance('finish')}>Terminar</button>
+            <p className="min-w-0 flex-1 basis-48 text-sm font-semibold">¿Saltar al podio? Se cortan las preguntas que faltan y no se puede volver atrás.</p>
+            <button className="sticker-btn-danger" disabled={advancing} onClick={() => advance('finish')}>Ir al podio</button>
             <button className="quiet-link" onClick={() => setConfirmingFinish(false)} autoFocus>Cancelar</button>
           </div>
         ) : (
@@ -215,7 +238,7 @@ function Control({ gameId }: { gameId: string }) {
               </a>
             )}
             {inGame && (
-              <button className="quiet-link" disabled={advancing} onClick={() => setConfirmingFinish(true)}>Terminar quiz</button>
+              <button className="quiet-link" disabled={advancing} onClick={() => setConfirmingFinish(true)}>Saltar al podio</button>
             )}
           </div>
         )}
