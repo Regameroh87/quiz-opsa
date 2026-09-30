@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Logo from '@/components/Logo'
+import PageTransition from '@/components/PageTransition'
 import { SHAPES } from '@/components/OptionButton'
 import { deleteQuestionImages, uploadQuestionImage } from '@/lib/image'
 
@@ -18,7 +19,11 @@ const imageKey = (qid: string, field: ImageField) => `${qid}:${field}`
 
 const blank = (): Q => ({ id: crypto.randomUUID(), text: '', image_url: null, options: ['', '', '', ''], correct_index: 0, time_limit_s: 20, reveal_image_url: null, reveal_text: null })
 
-export default function QuizEditor() {
+export default function QuizEditorPage() {
+  return <PageTransition><QuizEditor /></PageTransition>
+}
+
+function QuizEditor() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [title, setTitle] = useState('')
@@ -117,7 +122,7 @@ export default function QuizEditor() {
       // Ya guardado: se borran las imágenes que el quiz dejó de usar.
       const kept = new Set(rows.flatMap((r) => [r.image_url, r.reveal_image_url]))
       deleteQuestionImages(savedImages.current.filter((u) => !kept.has(u)))
-      router.push('/')
+      router.push('/', { transitionTypes: ['nav-back'] })
     } catch {
       setError('No se pudo guardar. Intentá de nuevo.')
       setSaving(false)
@@ -136,7 +141,7 @@ export default function QuizEditor() {
     <div className="field">
       <form className="page max-w-3xl gap-8 pb-10" onSubmit={save}>
         <header className="flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="quiet-link">← Volver a tus quizzes</Link>
+          <Link href="/" className="quiet-link" transitionTypes={['nav-back']}>← Volver a tus quizzes</Link>
           <Logo height={32} />
         </header>
 

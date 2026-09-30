@@ -6,6 +6,7 @@ import QRCode from 'qrcode'
 import { errorMessage, rpc, useGame, useHostLive, useLatest, useQuestion, useRemaining, type Game, type Player } from '@/lib/game'
 import { OptionButton, OptionGrid } from '@/components/OptionButton'
 import Logo from '@/components/Logo'
+import PageTransition from '@/components/PageTransition'
 import Avatar, { AVATARS } from '@/components/Avatar'
 
 // Pantalla del proyector: todo escala en em a partir del font-size base.
@@ -25,7 +26,7 @@ const PODIUM = [
 // key: al pasar a la partida siguiente todo arranca de cero (conteos, auto-reveal, ranking).
 export default function HostPage() {
   const { gameId } = useParams<{ gameId: string }>()
-  return <Host key={gameId} gameId={gameId} />
+  return <PageTransition><Host key={gameId} gameId={gameId} /></PageTransition>
 }
 
 function Host({ gameId }: { gameId: string }) {

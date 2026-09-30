@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Stage from '@/components/Stage'
 import Logo from '@/components/Logo'
+import PageTransition from '@/components/PageTransition'
 import Avatar, { AVATARS } from '@/components/Avatar'
 
 export const metadata: Metadata = { title: '¡Gracias por jugar! · Quiz New Holland' }
@@ -11,6 +12,7 @@ export default async function Gracias({ searchParams }: { searchParams: Promise<
   const { avatar } = await searchParams
   const known = AVATARS.some((a) => a.id === avatar)
   return (
+    <PageTransition>
     <Stage>
       <section className="sticker-card stick-in flex flex-col items-center gap-3">
         {known && <Avatar id={avatar} className="-mt-24 mb-1 size-28 border-[6px] shadow-[0_8px_0_rgb(0_20_60/0.4)]" />}
@@ -26,5 +28,6 @@ export default async function Gracias({ searchParams }: { searchParams: Promise<
         </a>
       </footer>
     </Stage>
+    </PageTransition>
   )
 }

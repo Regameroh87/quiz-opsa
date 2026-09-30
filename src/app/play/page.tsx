@@ -7,6 +7,7 @@ import { errorMessage, rpc, useGame, useQuestion, useRemaining, type Standing } 
 import { OptionButton, OptionGrid } from '@/components/OptionButton'
 import Avatar, { AVATARS, type AvatarId } from '@/components/Avatar'
 import Logo from '@/components/Logo'
+import PageTransition from '@/components/PageTransition'
 
 const URGENT_S = 5
 
@@ -21,7 +22,7 @@ function Status({ children }: { children: React.ReactNode }) {
 
 // useSearchParams necesita un límite de Suspense para el prerender.
 export default function PlayPage() {
-  return <Suspense fallback={<Status>Conectando…</Status>}><Play /></Suspense>
+  return <PageTransition><Suspense fallback={<Status>Conectando…</Status>}><Play /></Suspense></PageTransition>
 }
 
 function Play() {

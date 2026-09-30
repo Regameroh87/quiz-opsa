@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { errorMessage, rpc, type Game, type Phase } from '@/lib/game'
 import Logo from '@/components/Logo'
+import PageTransition from '@/components/PageTransition'
 import { deleteQuestionImages } from '@/lib/image'
 
 interface Quiz { id: string; title: string; created_at: string; questions: { count: number }[] }
@@ -129,7 +130,7 @@ function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () 
                 <Link className="sticker-btn-ghost sticker-btn-sm" href={`/host/${g.id}`} target="_blank" aria-describedby={titleId}>
                   Proyector<span className="sr-only"> (se abre en otra pestaña)</span>
                 </Link>
-                <Link className="sticker-btn sticker-btn-sm" href={`/control/${g.id}`} aria-describedby={`${titleId} ${phaseId}`}>Controlar</Link>
+                <Link className="sticker-btn sticker-btn-sm" href={`/control/${g.id}`} transitionTypes={['nav-forward']} aria-describedby={`${titleId} ${phaseId}`}>Controlar</Link>
               </div>
             </li>
           )
@@ -167,7 +168,7 @@ function AdminHeader({ liveCount }: { liveCount: number }) {
             Cerrar sesión
           </button>
         </div>
-        <Link className="sticker-btn-ghost sticker-btn-sm shrink-0" href="/quiz/new">Nuevo quiz</Link>
+        <Link className="sticker-btn-ghost sticker-btn-sm shrink-0" href="/quiz/new" transitionTypes={['nav-forward']}>Nuevo quiz</Link>
       </header>
 
       {/* Aviso de ancho completo debajo del encabezado: no desarma la fila de arriba. */}
@@ -223,7 +224,11 @@ function EmptyMascot() {
   )
 }
 
-export default function QuizList() {
+export default function QuizListPage() {
+  return <PageTransition><QuizList /></PageTransition>
+}
+
+function QuizList() {
   const [list, setList] = useState<ListState>({ status: 'loading' })
   const [busy, setBusy] = useState<Busy>(null)
   // El error se muestra en la tarjeta del quiz que falló, no arriba de todo.
@@ -302,7 +307,7 @@ export default function QuizList() {
       // Si el navegador bloqueó la pestaña, el control ofrece abrir el proyector.
       if (tab) tab.location.href = `/host/${game.id}`
       // Se mantiene bloqueado hasta que carga el control, para no crear otra partida.
-      router.push(`/control/${game.id}`)
+      router.push(`/control/${game.id}`, { transitionTypes: ['nav-forward'] })
     } catch (e) {
       tab?.close()
       // Otro admin pudo haberle quitado las preguntas desde que se cargó la lista.
@@ -367,7 +372,7 @@ export default function QuizList() {
           <div className="flex flex-col items-center gap-4 sm:items-start">
             <p className="font-display text-3xl leading-tight">Todavía no hay quizzes</p>
             <p className="text-ink-soft">Armá el primero: preguntas, opciones y tiempo, y ya lo podés lanzar en el evento.</p>
-            <Link className="sticker-btn sticker-btn-sm" href="/quiz/new">Crear el primer quiz</Link>
+            <Link className="sticker-btn sticker-btn-sm" href="/quiz/new" transitionTypes={['nav-forward']}>Crear el primer quiz</Link>
           </div>
         </div>
       )}
@@ -387,7 +392,7 @@ export default function QuizList() {
                   {empty ? (
                     <p id={metaId} className="text-ink-soft">
                       Sin preguntas todavía.{' '}
-                      <Link className="font-semibold text-brand underline underline-offset-4" href={`/quiz/${q.id}`}>Agregá preguntas</Link>
+                      <Link className="font-semibold text-brand underline underline-offset-4" href={`/quiz/${q.id}`} transitionTypes={['nav-forward']}>Agregá preguntas</Link>
                     </p>
                   ) : (
                     <p id={metaId} className="text-ink-soft">{quizMeta(q)}</p>
@@ -427,7 +432,7 @@ export default function QuizList() {
                   )}
                 </div>
                 {openGameByQuiz.has(q.id) ? (
-                  <Link className="sticker-btn-ghost sticker-btn-sm self-start" href={`/control/${openGameByQuiz.get(q.id)}`} aria-describedby={titleId}>
+                  <Link className="sticker-btn-ghost sticker-btn-sm self-start" href={`/control/${openGameByQuiz.get(q.id)}`} transitionTypes={['nav-forward']} aria-describedby={titleId}>
                     Controlar partida
                   </Link>
                 ) : (

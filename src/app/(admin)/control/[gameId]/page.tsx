@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { errorMessage, rpc, useGame, useHostLive, useQuestion, useRemaining, type Game, type Phase } from '@/lib/game'
 import { SHAPES } from '@/components/OptionButton'
 import Logo from '@/components/Logo'
+import PageTransition from '@/components/PageTransition'
 import Avatar from '@/components/Avatar'
 
 // "Revelar ahora" no acepta toques en los primeros segundos: un toque de más en "Empezar"/"Siguiente"
@@ -32,7 +33,7 @@ const SCREEN_NOW: Record<Phase, { title: string; hint: string }> = {
 // key: al pasar a la partida siguiente todo arranca de cero.
 export default function ControlPage() {
   const { gameId } = useParams<{ gameId: string }>()
-  return <Control key={gameId} gameId={gameId} />
+  return <PageTransition><Control key={gameId} gameId={gameId} /></PageTransition>
 }
 
 function Control({ gameId }: { gameId: string }) {
@@ -219,7 +220,7 @@ function Control({ gameId }: { gameId: string }) {
             label={closing ? 'Terminando…' : 'Terminar quiz'} hint="Sin otro quiz: los celulares muestran el agradecimiento" />
         )}
         {phase === 'finished' && (
-          <Link className={closed ? 'sticker-btn' : 'quiet-link self-center'} href="/">Volver al panel</Link>
+          <Link className={closed ? 'sticker-btn' : 'quiet-link self-center'} href="/" transitionTypes={['nav-back']}>Volver al panel</Link>
         )}
 
         {/* Saltar al podio se confirma en el lugar: corta las preguntas que faltan y no se puede reabrir. */}
@@ -407,7 +408,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="field">
       <main className="page gap-5">
         <header className="flex items-center justify-between gap-4">
-          <Link className="quiet-link" href="/">← Panel</Link>
+          <Link className="quiet-link" href="/" transitionTypes={['nav-back']}>← Panel</Link>
           <Logo height={28} />
         </header>
         {children}
