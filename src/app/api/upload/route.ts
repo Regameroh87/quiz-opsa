@@ -1,25 +1,11 @@
 import { AwsClient } from 'aws4fetch'
-import { createClient } from '@supabase/supabase-js'
+import { adminDb } from '@/lib/admin-api'
 
-// Único endpoint del servidor: las claves de R2 no pueden llegar al navegador.
+// Las claves de R2 no pueden llegar al navegador.
 // POST firma una subida para que el admin mande la imagen ya optimizada directo al bucket;
 // DELETE borra imágenes que ninguna pregunta usa.
 
 const KEY = /^questions\/[0-9a-f-]{36}\.webp$/
-
-/** Cliente de Supabase con el token del pedido, o null si no es un admin (RLS de `admins` decide, igual que en el panel). */
-async function adminDb(req: Request) {
-  const token = req.headers.get('authorization')?.replace(/^Bearer /, '')
-  if (!token) return null
-  const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { persistSession: false },
-  })
-  const { data: user } = await db.auth.getUser(token)
-  if (!user.user || user.user.is_anonymous) return null
-  const { data: admin } = await db.from('admins').select('user_id').maybeSingle()
-  return admin ? db : null
-}
 
 // Se crea por pedido: sin las variables de R2 el build no debe romperse.
 function bucket() {

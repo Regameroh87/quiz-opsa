@@ -5,6 +5,12 @@ export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
 )
 
+/** Header con el token de la sesión, para las rutas de /api (que verifican que sea un admin). */
+export async function authHeader() {
+  const { data } = await supabase.auth.getSession()
+  return { authorization: `Bearer ${data.session?.access_token ?? ''}` }
+}
+
 /** Los jugadores entran con sesión anónima; se conserva al recargar. */
 export async function ensureSession() {
   const { data } = await supabase.auth.getSession()

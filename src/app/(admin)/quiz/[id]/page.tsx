@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { authHeader, supabase } from '@/lib/supabase'
 import Logo from '@/components/Logo'
 import { errorMessage } from '@/lib/game'
 import PageTransition from '@/components/PageTransition'
@@ -19,6 +19,11 @@ type ImageField = 'image_url' | 'reveal_image_url'
 const imageKey = (qid: string, field: ImageField) => `${qid}:${field}`
 
 const blank = (): Q => ({ id: crypto.randomUUID(), text: '', image_url: null, options: ['', '', '', ''], correct_index: 0, time_limit_s: 20, reveal_image_url: null, reveal_text: null })
+const isEmpty = (q: Q) => !q.text.trim() && !q.image_url && !q.reveal_image_url && q.options.every((o) => !o.trim())
+
+// Armado con IA (/api/generate): el tope es el mismo que valida el servidor.
+const AI_MAX = 20
+const AI_FORM = 'ai-quiz'
 
 export default function QuizEditorPage() {
   return <PageTransition><QuizEditor /></PageTransition>
@@ -39,6 +44,7 @@ function QuizEditor() {
   // Imágenes del quiz tal como está guardado: las que se quiten se borran del bucket recién al guardar.
   const savedImages = useRef<string[]>([])
   const [imageError, setImageError] = useState<{ key: string; message: string } | null>(null)
+  const [ai, setAi] = useState({ open: false, topic: '', count: 10, busy: false, error: '' })
 
   useEffect(() => {
     if (id === 'new') return
@@ -94,6 +100,28 @@ function QuizEditor() {
     }
   }
 
+  // La IA arma un borrador: se revisa y se guarda con el botón de siempre.
+  const generate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAi((a) => ({ ...a, busy: true, error: '' }))
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { ...(await authHeader()), 'content-type': 'application/json' },
+        body: JSON.stringify({ topic: ai.topic.trim(), count: ai.count }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const out = (await res.json()) as { title: string; questions: Pick<Q, 'text' | 'options' | 'correct_index' | 'reveal_text'>[] }
+      const generated = out.questions.map((g) => ({ ...blank(), ...g, options: [...g.options, '', '', ''].slice(0, 4) }))
+      if (!title.trim()) setTitle(out.title)
+      // Si el quiz todavía está vacío se reemplaza; si ya tiene preguntas, se agregan al final.
+      setQuestions((qs) => [...qs.filter((q) => !isEmpty(q)), ...generated])
+      setAi((a) => ({ ...a, open: false, busy: false }))
+    } catch (err) {
+      setAi((a) => ({ ...a, busy: false, error: errorMessage(err) }))
+    }
+  }
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -142,6 +170,8 @@ function QuizEditor() {
 
   return (
     <div className="field">
+      {/* Formulario aparte (los campos están adentro del editor con form=AI_FORM): Enter genera, no guarda. */}
+      <form id={AI_FORM} onSubmit={generate} hidden />
       <form className="page max-w-3xl gap-8 pb-10" onSubmit={save}>
         <header className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/" className="quiet-link" transitionTypes={['nav-back']}>← Volver a tus quizzes</Link>
@@ -155,6 +185,33 @@ function QuizEditor() {
             <input className="sticker-input font-display text-2xl" placeholder="Ej.: Conocé la línea T7" value={title}
               onChange={(e) => setTitle(e.target.value)} maxLength={120} required />
           </label>
+          {ai.open ? (
+            <div className="flex flex-col gap-3 rounded-2xl border-[3px] border-dashed border-ink-soft/40 p-4">
+              <p className="font-display text-lg text-brand">Armar preguntas con IA</p>
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="sticker-label min-w-48 flex-1">
+                  Tema
+                  <input form={AI_FORM} className="sticker-input" placeholder="Ej.: Historia de los tractores" value={ai.topic}
+                    onChange={(e) => setAi((a) => ({ ...a, topic: e.target.value }))} maxLength={200} required autoFocus disabled={ai.busy} />
+                </label>
+                <label className="sticker-label">
+                  Cantidad
+                  <input form={AI_FORM} className="sticker-input w-24 p-2 text-center" type="number" min={1} max={AI_MAX} value={ai.count}
+                    onChange={(e) => setAi((a) => ({ ...a, count: Number(e.target.value) }))} required disabled={ai.busy} />
+                </label>
+              </div>
+              {ai.error && <p className="sticker-note" role="alert">{ai.error}</p>}
+              <div className="flex flex-wrap items-center gap-3">
+                <button form={AI_FORM} className="sticker-btn sticker-btn-sm" disabled={ai.busy}>{ai.busy ? 'Armando preguntas…' : 'Generar'}</button>
+                <button type="button" className="quiet-link" disabled={ai.busy} onClick={() => setAi((a) => ({ ...a, open: false, error: '' }))}>Cancelar</button>
+              </div>
+              <p className="text-sm text-ink-soft">Revisá las preguntas antes de guardar: la IA se puede equivocar.</p>
+            </div>
+          ) : (
+            <button type="button" className="sticker-btn-ghost sticker-btn-sm self-start" onClick={() => setAi((a) => ({ ...a, open: true }))}>
+              ✨ Armar con IA
+            </button>
+          )}
         </section>
 
         <ol className="flex flex-col gap-10">

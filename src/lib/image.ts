@@ -1,13 +1,8 @@
-import { supabase } from '@/lib/supabase'
+import { authHeader } from '@/lib/supabase'
 
 // Lado máximo y calidad: nítida en el proyector y liviana para 190 celulares a la vez.
 const MAX_SIDE = 1600
 const QUALITY = 0.82
-
-async function authHeader() {
-  const { data } = await supabase.auth.getSession()
-  return { authorization: `Bearer ${data.session?.access_token ?? ''}` }
-}
 
 /** Achica la imagen y la pasa a WebP en el navegador, antes de subirla. */
 async function optimize(file: File): Promise<Blob> {

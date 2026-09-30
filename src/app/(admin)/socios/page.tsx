@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { authHeader, supabase } from '@/lib/supabase'
 import { QUIZ_LIMIT } from '@/lib/game'
 import Logo from '@/components/Logo'
 import PageTransition from '@/components/PageTransition'
@@ -19,11 +19,6 @@ type Access = 'loading' | 'admin' | 'forbidden'
 
 interface Member { id: string; email: string; role: 'admin' | 'user'; quizzes: number; createdAt: string; lastSignInAt: string | null }
 type MembersState = { status: 'loading' | 'error' } | { status: 'ready'; members: Member[] }
-
-const authHeader = async () => {
-  const { data } = await supabase.auth.getSession()
-  return { authorization: `Bearer ${data.session?.access_token ?? ''}` }
-}
 
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Nunca'
