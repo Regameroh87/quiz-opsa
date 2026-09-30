@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { liveChannel, supabase } from '@/lib/supabase'
 import { errorMessage, QUIZ_LIMIT, rpc, type Game, type Phase } from '@/lib/game'
 import Logo from '@/components/Logo'
 import AccountMenu from '@/components/AccountMenu'
@@ -176,7 +176,9 @@ function AdminHeader({ liveCount, quizCount }: { liveCount: number; quizCount: n
     <>
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <Logo height={36} />
-        <div className="flex items-center gap-3">
+        {/* ml-auto: en el celular este grupo baja de renglón y queda a la derecha, así el menú de la cuenta
+            (anclado al borde derecho del avatar) se abre dentro de la pantalla. */}
+        <div className="ml-auto flex items-center gap-3">
           {/* Un usuario común ve solo sus quizzes, así que la cantidad de la lista es la suya. */}
           {role === 'user' && quizCount >= QUIZ_LIMIT
             ? <span className="text-ink-soft">Límite de {QUIZ_LIMIT} quizzes</span>
@@ -280,7 +282,7 @@ function QuizList() {
         void fetchLiveGames().then((s) => s.status === 'ready' && setLive(s))
       }, 400)
     }
-    const ch = supabase.channel('admin-panel')
+    const ch = liveChannel('admin-panel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, refresh)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'quizzes' }, refresh)

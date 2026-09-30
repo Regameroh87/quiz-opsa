@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { supabase } from './supabase'
+import { liveChannel, supabase } from './supabase'
 
 export type Phase = 'lobby' | 'question' | 'reveal' | 'leaderboard' | 'finished'
 
@@ -116,7 +116,7 @@ export function useGame(key: { id: string } | { code: string }) {
       setGame(data as Game)
       return data as Game
     }
-    const channel = supabase.channel(`game-${val}`)
+    const channel = liveChannel(`game-${val}`)
     load().then((g) => {
       if (!g) return
       gameId = g.id
@@ -201,7 +201,7 @@ export function useHostLive(game: Game | null, questionId: string | undefined) {
     const load = () =>
       supabase.from('players').select('nickname, avatar').eq('game_id', gameId).order('created_at')
         .then(({ data }) => setPlayers(data ?? []))
-    const ch = supabase.channel(`players-${gameId}`)
+    const ch = liveChannel(`players-${gameId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` },
         (p) => {
           const { nickname, avatar } = p.new as Player
@@ -218,7 +218,7 @@ export function useHostLive(game: Game | null, questionId: string | undefined) {
   // Respuestas en vivo: se cuentan inserts y se recarga la distribución al cambiar de fase.
   useEffect(() => {
     if (!gameId) return
-    const ch = supabase.channel(`answers-${gameId}`)
+    const ch = liveChannel(`answers-${gameId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'answers', filter: `game_id=eq.${gameId}` },
         (p) => {
           const qid = (p.new as { question_id: string }).question_id
