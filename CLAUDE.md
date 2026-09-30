@@ -40,4 +40,6 @@ Database: schema lives in `supabase/migrations/` (apply as new numbered migratio
 
 **Styling:** Tailwind v4 configured in CSS (`src/app/globals.css`): New Holland brand colors in `@theme`, and shared primitives (`.page`, `.card`, `.btn`, `.btn-secondary`, `.input`, `.badge`, `.timer`) in `@layer components`. The host screen scales everything in `em` from a viewport-based base font size so it fits any projector.
 
+Players pick an avatar (one of the four characters in `public/mascotas`) when joining; the allowed ids live both in `src/components/Avatar.tsx` and in the `players.avatar` check / `join_game` (`0006_player_avatar.sql`) — keep them in sync.
+
 Player count per game is capped at 190 in `join_game` (Supabase Realtime connection limit of the plan).

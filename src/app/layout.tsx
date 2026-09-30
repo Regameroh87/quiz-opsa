@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Bowlby_One, Rubik } from "next/font/google";
 import "./globals.css";
 import PwaRegister from "@/components/PwaRegister";
-import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 
 // Display gruesa tipo sticker para títulos; Rubik para la UI (botones incluidos).
 const display = Bowlby_One({ weight: "400", subsets: ["latin"], variable: "--font-bowlby" });
@@ -56,7 +55,6 @@ export default function RootLayout({
       <body>
         <PwaRegister />
         {children}
-        <PwaInstallPrompt />
       </body>
     </html>
   );

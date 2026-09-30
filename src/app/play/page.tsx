@@ -88,21 +88,23 @@ function Play() {
 
         <fieldset className="flex flex-col gap-2">
           <legend className="sticker-label mb-2">Elegí tu personaje</legend>
-          <div className="grid grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 gap-3">
             {AVATARS.map((a, i) => {
               const selected = avatar === a.id
               return (
-                <label key={a.id} className="group flex cursor-pointer flex-col items-center gap-1">
+                <label key={a.id} className="flex cursor-pointer flex-col items-center gap-1.5">
                   <input type="radio" name="avatar" value={a.id} checked={selected} className="peer sr-only"
                     onChange={() => { setAvatar(a.id); setError('') }} />
-                  <span className={`relative block w-full rounded-full motion-safe:transition-[translate,scale,opacity] motion-safe:duration-200 peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand ${selected ? '-translate-y-1 scale-105' : avatar ? 'opacity-55' : ''}`}
-                    style={{ rotate: `${[-4, 3, -2, 4][i]}deg` }}>
-                    <Avatar id={a.id} className={`w-full border-4 ${selected ? 'shadow-[0_5px_0_rgb(0_20_60/0.5)]' : 'shadow-[0_3px_0_rgb(0_20_60/0.35)]'}`} />
+                  {/* Cada personaje es un sticker: al elegirlo se levanta y lleva su tilde. */}
+                  <span className={`relative block w-full overflow-hidden rounded-[20px] border-4 border-white bg-white motion-safe:transition-[translate,opacity,box-shadow] motion-safe:duration-200 peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand ${selected ? '-translate-y-1 shadow-[0_6px_0_rgb(0_20_60/0.55)]' : `shadow-[0_3px_0_rgb(0_20_60/0.35)] ${avatar ? 'opacity-55' : ''}`}`}
+                    style={{ rotate: `${[-2, 1.5, 1.5, -2][i]}deg` }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- ya optimizada */}
+                    <img src={a.src} alt="" draggable={false} className="block aspect-[4/3] w-full object-cover" />
                     {selected && (
-                      <span aria-hidden className="absolute -right-1 -bottom-1 flex size-6 items-center justify-center rounded-full border-2 border-white bg-field text-xs font-black text-white">✓</span>
+                      <span aria-hidden className="absolute right-1.5 bottom-1.5 flex size-7 items-center justify-center rounded-full border-2 border-white bg-field text-sm font-black text-white">✓</span>
                     )}
                   </span>
-                  <span className={`text-[11px] font-bold ${selected ? 'text-white' : 'text-ink-soft'}`}>{a.name}</span>
+                  <span className={`text-sm font-bold ${selected ? 'text-white' : 'text-ink-soft'}`}>{a.name}</span>
                 </label>
               )
             })}

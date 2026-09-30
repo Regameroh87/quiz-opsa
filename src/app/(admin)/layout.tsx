@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Logo from '@/components/Logo'
+import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 
 type Status =
   | { status: 'loading' | 'out' }
@@ -48,7 +49,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </Stage>
     )
   }
-  return children
+  // Instalar la app solo le sirve al admin (controlar la partida desde el celular):
+  // en /play y en el proyector el aviso tapaba la pantalla.
+  return <>{children}<PwaInstallPrompt /></>
 }
 
 // Las mascotas son stickers pegados en las esquinas del campo; decorativas (aria-hidden).
