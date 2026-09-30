@@ -3,20 +3,32 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { liveChannel, supabase } from '@/lib/supabase'
+import { authHeader, liveChannel, supabase } from '@/lib/supabase'
 import { errorMessage, QUIZ_LIMIT, rpc, type Game, type Phase } from '@/lib/game'
 import Logo from '@/components/Logo'
 import AccountMenu from '@/components/AccountMenu'
 import PageTransition from '@/components/PageTransition'
 import { deleteQuestionImages } from '@/lib/image'
 
-interface Quiz { id: string; title: string; created_at: string; questions: { count: number }[] }
+interface Quiz { id: string; title: string; created_at: string; created_by: string | null; questions: { count: number }[] }
 
-type ListState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; quizzes: Quiz[] }
+// userId: para separar los quizzes propios de los de otros socios (un admin ve todos; un user, solo los suyos).
+type ListState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; quizzes: Quiz[]; userId: string | null }
 
 async function fetchQuizzes(): Promise<ListState> {
-  const { data, error } = await supabase.from('quizzes').select('id, title, created_at, questions(count)').order('created_at', { ascending: false })
-  return error ? { status: 'error' } : { status: 'ready', quizzes: data }
+  const [{ data: auth }, { data, error }] = await Promise.all([
+    supabase.auth.getSession(),
+    supabase.from('quizzes').select('id, title, created_at, created_by, questions(count)').order('created_at', { ascending: false }),
+  ])
+  return error ? { status: 'error' } : { status: 'ready', quizzes: data, userId: auth.session?.user.id ?? null }
+}
+
+/** Mail de cada cuenta del panel, para decir de quién es un quiz ajeno. Solo lo puede pedir un admin (/api/socios). */
+async function fetchOwnerEmails(): Promise<Map<string, string>> {
+  const res = await fetch('/api/socios', { headers: await authHeader() }).catch(() => null)
+  if (!res?.ok) return new Map()
+  const { members } = (await res.json()) as { members: { id: string; email: string }[] }
+  return new Map(members.map((m) => [m.id, m.email]))
 }
 
 interface LiveGame {
@@ -263,6 +275,8 @@ function QuizList() {
   const router = useRouter()
 
   const [live, setLive] = useState<LiveState>({ status: 'loading' })
+  // Dueños de los quizzes ajenos (solo los ve un admin); sin mail se muestra «otro socio».
+  const [owners, setOwners] = useState<Map<string, string>>(new Map())
 
   const load = () => fetchQuizzes().then(setList)
   useEffect(() => {
@@ -298,6 +312,14 @@ function QuizList() {
       void supabase.removeChannel(ch)
     }
   }, [])
+
+  const userId = list.status === 'ready' ? list.userId : null
+  const mine = list.status === 'ready' ? list.quizzes.filter((q) => q.created_by === userId) : []
+  const others = list.status === 'ready' ? list.quizzes.filter((q) => q.created_by !== userId) : []
+  const missingOwner = others.some((q) => q.created_by && !owners.has(q.created_by))
+  useEffect(() => {
+    if (missingOwner) void fetchOwnerEmails().then(setOwners)
+  }, [missingOwner])
 
   // La lista espera a las partidas en curso: así la franja no aparece después y empuja los botones.
   const listReady = list.status !== 'loading' && live.status !== 'loading'
@@ -365,6 +387,74 @@ function QuizList() {
     void fetchLiveGames().then(setLive)
   }
 
+  const renderCard = (q: Quiz, i: number) => {
+    const launching = busy?.quizId === q.id && busy.action === 'launch'
+    const removing = busy?.quizId === q.id && busy.action === 'remove'
+    const titleId = `quiz-${q.id}`
+    const metaId = `quiz-meta-${q.id}`
+    const empty = questionCount(q) === 0
+    return (
+      <li key={q.id} className="sticker-panel flex flex-col gap-4 p-6" style={{ '--tilt': TILTS[i % TILTS.length] } as React.CSSProperties} aria-busy={launching || removing}>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <strong id={titleId} className="text-[1.35rem] leading-snug break-words">{q.title}</strong>
+          {empty ? (
+            <p id={metaId} className="text-ink-soft">
+              Sin preguntas todavía.{' '}
+              <Link className="font-semibold text-brand underline underline-offset-4" href={`/quiz/${q.id}`} transitionTypes={['nav-forward']}>Agregá preguntas</Link>
+            </p>
+          ) : (
+            <p id={metaId} className="text-ink-soft">{quizMeta(q)}</p>
+          )}
+          {q.created_by !== userId && (
+            <p className="text-sm font-semibold break-all text-ink-soft">De {(q.created_by && owners.get(q.created_by)) || 'otro socio'}</p>
+          )}
+          {confirming === q.id ? (
+            <div key="confirm" className="flex flex-wrap items-center gap-x-4 gap-y-2"
+              onKeyDown={(e) => e.key === 'Escape' && cancelRemove()}>
+              <span>
+                {openGameByQuiz.has(q.id)
+                  ? <>Tiene una partida en curso: si lo borrás, la sala se corta. ¿Borrar igual<span className="sr-only"> «{q.title}»</span>? </>
+                  : <>¿Borrar este quiz<span className="sr-only"> «{q.title}»</span> con sus preguntas y partidas? </>}
+                No se puede deshacer.
+              </span>
+              <button className={DANGER} onClick={() => remove(q)} aria-describedby={titleId}>Borrar quiz</button>
+              <button className={QUIET} onClick={cancelRemove} autoFocus>Cancelar</button>
+            </div>
+          ) : (
+            <div key="actions" className="-ml-1 flex gap-4">
+              <Link className={`${QUIET} ${busy ? 'pointer-events-none opacity-50' : ''}`}
+                href={`/quiz/${q.id}`} aria-describedby={titleId} aria-disabled={!!busy} tabIndex={busy ? -1 : undefined}>
+                Editar
+              </Link>
+              <button className={QUIET} disabled={!!busy} aria-describedby={titleId}
+                autoFocus={cancelledRemove === q.id} onClick={() => askRemove(q.id)}>
+                {removing ? 'Borrando…' : 'Borrar'}
+              </button>
+            </div>
+          )}
+          {cardError?.quizId === q.id && (
+            // Recibe el foco: el botón que lo disparó queda deshabilitado mientras corre la acción.
+            <p className="sticker-note" role="alert" tabIndex={-1} ref={focusOnMount}>
+              {cardError.message}{' '}
+              {cardError.fixHref && (
+                <Link className="font-bold text-white underline underline-offset-4" href={cardError.fixHref}>Editar quiz</Link>
+              )}
+            </p>
+          )}
+        </div>
+        {openGameByQuiz.has(q.id) ? (
+          <Link className="sticker-btn-ghost sticker-btn-sm self-start" href={`/control/${openGameByQuiz.get(q.id)}`} transitionTypes={['nav-forward']} aria-describedby={titleId}>
+            Controlar partida
+          </Link>
+        ) : (
+          <button className="sticker-btn sticker-btn-sm self-start" disabled={!!busy || empty} aria-describedby={`${titleId} ${metaId}`} onClick={() => launch(q.id)}>
+            {launching ? 'Abriendo sala…' : 'Lanzar en vivo'}
+          </button>
+        )}
+      </li>
+    )
+  }
+
   return (
     <div className="field">
     <main className="page max-w-5xl gap-7 pb-16">
@@ -403,73 +493,26 @@ function QuizList() {
         </div>
       )}
 
-      {listReady && list.status === 'ready' && list.quizzes.length > 0 && (
+      {listReady && list.status === 'ready' && list.quizzes.length > 0 && mine.length === 0 && (
+        <p className="text-ink-soft">
+          Todavía no armaste quizzes propios.{' '}
+          <Link className="font-semibold text-brand underline underline-offset-4" href="/quiz/new" transitionTypes={['nav-forward']}>Crear uno</Link>
+        </p>
+      )}
+      {listReady && mine.length > 0 && (
         <ul className="grid gap-x-6 gap-y-8 md:grid-cols-2">
-          {list.quizzes.map((q, i) => {
-            const launching = busy?.quizId === q.id && busy.action === 'launch'
-            const removing = busy?.quizId === q.id && busy.action === 'remove'
-            const titleId = `quiz-${q.id}`
-            const metaId = `quiz-meta-${q.id}`
-            const empty = questionCount(q) === 0
-            return (
-              <li key={q.id} className="sticker-panel flex flex-col gap-4 p-6" style={{ '--tilt': TILTS[i % TILTS.length] } as React.CSSProperties} aria-busy={launching || removing}>
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <strong id={titleId} className="text-[1.35rem] leading-snug break-words">{q.title}</strong>
-                  {empty ? (
-                    <p id={metaId} className="text-ink-soft">
-                      Sin preguntas todavía.{' '}
-                      <Link className="font-semibold text-brand underline underline-offset-4" href={`/quiz/${q.id}`} transitionTypes={['nav-forward']}>Agregá preguntas</Link>
-                    </p>
-                  ) : (
-                    <p id={metaId} className="text-ink-soft">{quizMeta(q)}</p>
-                  )}
-                  {confirming === q.id ? (
-                    <div key="confirm" className="flex flex-wrap items-center gap-x-4 gap-y-2"
-                      onKeyDown={(e) => e.key === 'Escape' && cancelRemove()}>
-                      <span>
-                        {openGameByQuiz.has(q.id)
-                          ? <>Tiene una partida en curso: si lo borrás, la sala se corta. ¿Borrar igual<span className="sr-only"> «{q.title}»</span>? </>
-                          : <>¿Borrar este quiz<span className="sr-only"> «{q.title}»</span> con sus preguntas y partidas? </>}
-                        No se puede deshacer.
-                      </span>
-                      <button className={DANGER} onClick={() => remove(q)} aria-describedby={titleId}>Borrar quiz</button>
-                      <button className={QUIET} onClick={cancelRemove} autoFocus>Cancelar</button>
-                    </div>
-                  ) : (
-                    <div key="actions" className="-ml-1 flex gap-4">
-                      <Link className={`${QUIET} ${busy ? 'pointer-events-none opacity-50' : ''}`}
-                        href={`/quiz/${q.id}`} aria-describedby={titleId} aria-disabled={!!busy} tabIndex={busy ? -1 : undefined}>
-                        Editar
-                      </Link>
-                      <button className={QUIET} disabled={!!busy} aria-describedby={titleId}
-                        autoFocus={cancelledRemove === q.id} onClick={() => askRemove(q.id)}>
-                        {removing ? 'Borrando…' : 'Borrar'}
-                      </button>
-                    </div>
-                  )}
-                  {cardError?.quizId === q.id && (
-                    // Recibe el foco: el botón que lo disparó queda deshabilitado mientras corre la acción.
-                    <p className="sticker-note" role="alert" tabIndex={-1} ref={focusOnMount}>
-                      {cardError.message}{' '}
-                      {cardError.fixHref && (
-                        <Link className="font-bold text-white underline underline-offset-4" href={cardError.fixHref}>Editar quiz</Link>
-                      )}
-                    </p>
-                  )}
-                </div>
-                {openGameByQuiz.has(q.id) ? (
-                  <Link className="sticker-btn-ghost sticker-btn-sm self-start" href={`/control/${openGameByQuiz.get(q.id)}`} transitionTypes={['nav-forward']} aria-describedby={titleId}>
-                    Controlar partida
-                  </Link>
-                ) : (
-                  <button className="sticker-btn sticker-btn-sm self-start" disabled={!!busy || empty} aria-describedby={`${titleId} ${metaId}`} onClick={() => launch(q.id)}>
-                    {launching ? 'Abriendo sala…' : 'Lanzar en vivo'}
-                  </button>
-                )}
-              </li>
-            )
-          })}
+          {mine.map(renderCard)}
         </ul>
+      )}
+
+      {/* Solo le pasa a un admin: los quizzes de los socios van aparte y con su dueño. */}
+      {listReady && others.length > 0 && (
+        <section aria-labelledby="others-heading" className="flex flex-col gap-5">
+          <h2 id="others-heading" className="font-display text-[clamp(1.8rem,4vw,2.4rem)] leading-none text-brand">De otros socios</h2>
+          <ul className="grid gap-x-6 gap-y-8 md:grid-cols-2">
+            {others.map(renderCard)}
+          </ul>
+        </section>
       )}
     </main>
     </div>
