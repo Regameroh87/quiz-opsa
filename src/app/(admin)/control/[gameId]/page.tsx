@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { errorMessage, rpc, useGame, useHostLive, useQuestion, useRemaining, type Game, type Phase } from '@/lib/game'
 import { SHAPES } from '@/components/OptionButton'
@@ -29,8 +29,13 @@ const SCREEN_NOW: Record<Phase, { title: string; hint: string }> = {
  * Control de la partida desde el panel: pensado para el celular del anfitrión.
  * La pantalla del proyector (/host) solo muestra; todos los pasos se dan desde acá.
  */
-export default function Control() {
+// key: al pasar a la partida siguiente todo arranca de cero.
+export default function ControlPage() {
   const { gameId } = useParams<{ gameId: string }>()
+  return <Control key={gameId} gameId={gameId} />
+}
+
+function Control({ gameId }: { gameId: string }) {
   const { game, error, setGame } = useGame({ id: gameId })
   const q = useQuestion(game)
   const remaining = useRemaining(q)
@@ -93,10 +98,12 @@ export default function Control() {
 
         {phase === 'lobby' && (
           <>
-            <div className="grid grid-cols-2 gap-3">
-              <Stat label="Código" value={<span className="tracking-[.08em]">{game.code}</span>} />
-              <Stat label={players.length === 1 ? 'Jugador' : 'Jugadores'} value={players.length} />
-            </div>
+            {/* El código va a todo el ancho: 6 caracteres grandes no entran en medio celular. */}
+            <Stat label="Código para sumarse" value={<span className="tracking-[.1em]">{game.code}</span>} />
+            <p className="font-bold" aria-live="polite">
+              <span className="font-display text-2xl tabular-nums">{players.length}</span>{' '}
+              <span className="text-ink-soft">{players.length === 1 ? 'jugador en la sala' : 'jugadores en la sala'}</span>
+            </p>
             {players.length > 0 ? (
               <ul className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto" aria-label="Jugadores en la sala">
                 {players.map((p) => (
@@ -131,10 +138,11 @@ export default function Control() {
 
         {phase === 'reveal' && q && (
           <>
-            <div className="grid grid-cols-2 gap-3">
-              <Stat label="Acertaron" value={<>{correctCount}<span className="text-lg text-ink-soft"> / {players.length}</span></>} />
-              <Stat label="Sin responder" value={Math.max(0, players.length - answeredTotal)} />
-            </div>
+            <p className="font-bold">
+              <span className="font-display text-2xl tabular-nums">{correctCount}</span>{' '}
+              <span className="text-ink-soft">de {players.length} acertaron</span>
+              {players.length > answeredTotal && <span className="text-ink-soft"> · {players.length - answeredTotal} sin responder</span>}
+            </p>
             <QuestionBlock text={q.data.text} options={q.data.options} correct={q.data.correct_index} stats={stats} />
           </>
         )}
@@ -152,6 +160,8 @@ export default function Control() {
           </ol>
         )}
       </section>
+
+      {phase === 'finished' && <NextQuiz game={game} />}
 
       {actionError && <p className="sticker-note" role="alert">{actionError}</p>}
 
@@ -180,7 +190,7 @@ export default function Control() {
           <StepButton ghost disabled={advancing} onClick={() => advance('leaderboard')}
             label="Mostrar ranking" hint="Antes de seguir, muestra los 5 primeros" />
         )}
-        {phase === 'finished' && <Link className="sticker-btn" href="/">Volver al panel</Link>}
+        {phase === 'finished' && <Link className="quiet-link self-center" href="/">Volver al panel</Link>}
 
         {/* Terminar se confirma en el lugar: corta la partida para todos y no se puede reabrir. */}
         {confirmingFinish ? (
@@ -204,6 +214,77 @@ export default function Control() {
         )}
       </div>
     </Shell>
+  )
+}
+
+interface QuizOption { id: string; title: string; questions: { count: number }[] }
+
+/**
+ * Desde el podio se lanza otro quiz en el mismo proyector: la partida terminada apunta a la nueva
+ * (create_next_game) y la pantalla del proyector la sigue sola. Este celular pasa al control nuevo.
+ */
+function NextQuiz({ game }: { game: Game }) {
+  const router = useRouter()
+  const [quizzes, setQuizzes] = useState<QuizOption[] | null>(null)
+  const [launching, setLaunching] = useState<string | null>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    void supabase.from('quizzes').select('id, title, questions(count)').order('created_at', { ascending: false })
+      .then(({ data }) => setQuizzes((data ?? []) as QuizOption[]))
+  }, [])
+
+  // Ya se lanzó desde otro dispositivo: se sigue a esa en vez de ofrecer otra.
+  if (game.next_game_id) {
+    return <Link className="sticker-btn" href={`/control/${game.next_game_id}`}>Ir a la partida siguiente</Link>
+  }
+
+  const launch = async (quizId: string) => {
+    setLaunching(quizId)
+    setError('')
+    try {
+      const next = await rpc<Game>('create_next_game', { p_game_id: game.id, p_quiz_id: quizId })
+      // Se mantiene bloqueado hasta que carga el control nuevo, para no lanzar dos.
+      router.push(`/control/${next.id}`)
+    } catch (e) {
+      setError(errorMessage(e))
+      setLaunching(null)
+    }
+  }
+
+  return (
+    <section className="sticker-panel flex flex-col gap-4 p-5" aria-labelledby="next-quiz">
+      <div className="flex flex-col gap-1">
+        <h2 id="next-quiz" className="font-display text-2xl leading-none">¿Otro quiz?</h2>
+        <p className="text-sm text-ink-soft">Se lanza en el mismo proyector: la pantalla pasa sola a la sala nueva con su QR.</p>
+      </div>
+      {quizzes === null && <p className="text-ink-soft" role="status">Cargando quizzes…</p>}
+      {quizzes?.length === 0 && <p className="text-ink-soft">No hay quizzes.</p>}
+      {quizzes && quizzes.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {quizzes.map((q) => {
+            const count = q.questions[0]?.count ?? 0
+            const titleId = `next-${q.id}`
+            return (
+              <li key={q.id} className="flex items-center gap-3 rounded-2xl bg-white/10 py-2 pr-2 pl-4">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <strong id={titleId} className="truncate">{q.title}</strong>
+                  <span className="text-sm text-ink-soft">
+                    {count === 0 ? 'Sin preguntas' : `${count} ${count === 1 ? 'pregunta' : 'preguntas'}`}
+                    {q.id === game.quiz_id && ' · el que terminó'}
+                  </span>
+                </div>
+                <button className="sticker-btn-ghost sticker-btn-sm shrink-0" disabled={!!launching || count === 0}
+                  aria-describedby={titleId} onClick={() => launch(q.id)}>
+                  {launching === q.id ? 'Lanzando…' : 'Lanzar'}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {error && <p className="sticker-note" role="alert">{error}</p>}
+    </section>
   )
 }
 
@@ -231,9 +312,9 @@ function Progress({ phase, current, total }: { phase: Phase; current: number; to
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-white/10 px-4 py-3">
-      <p className="text-xs font-bold tracking-[0.1em] text-ink-soft uppercase">{label}</p>
-      <p className="font-display text-3xl leading-tight">{value}</p>
+    <div className="min-w-0 rounded-2xl bg-white/10 px-4 py-3">
+      <p className="truncate text-xs font-bold tracking-[0.1em] text-ink-soft uppercase">{label}</p>
+      <p className="truncate font-display text-3xl leading-tight">{value}</p>
     </div>
   )
 }

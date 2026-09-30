@@ -11,6 +11,8 @@ export interface Game {
   phase: Phase
   current_position: number
   question_started_at: string | null
+  // La partida que se lanzó después de esta en el mismo proyector (ver create_next_game).
+  next_game_id: string | null
 }
 
 export interface CurrentQuestion {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useSyncExternalStore } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
 import { errorMessage, rpc, useGame, useHostLive, useLatest, useQuestion, useRemaining, type Game, type Player } from '@/lib/game'
 import { OptionButton, OptionGrid } from '@/components/OptionButton'
@@ -22,8 +22,13 @@ const PODIUM = [
   { height: 'min-h-[7em]', fill: 'bg-white text-navy', delay: 100 },
 ]
 
-export default function Host() {
+// key: al pasar a la partida siguiente todo arranca de cero (conteos, auto-reveal, ranking).
+export default function HostPage() {
   const { gameId } = useParams<{ gameId: string }>()
+  return <Host key={gameId} gameId={gameId} />
+}
+
+function Host({ gameId }: { gameId: string }) {
   const { game, error, setGame } = useGame({ id: gameId })
   const q = useQuestion(game)
   const remaining = useRemaining(q)
@@ -33,6 +38,14 @@ export default function Host() {
   const phase = game?.phase
   const pos = game?.current_position
   const playerCount = useLatest(players.length)
+
+  // Si desde el control se lanzó otro quiz, este proyector pasa solo a la sala nueva.
+  // Navegación del lado del cliente: se mantiene la pantalla completa.
+  const router = useRouter()
+  const nextGameId = game?.next_game_id
+  useEffect(() => {
+    if (nextGameId) router.replace(`/host/${nextGameId}`)
+  }, [nextGameId, router])
 
   // Los botones viven en el control del panel; el proyector solo revela solo, al acabarse el tiempo o si respondieron todos.
   // Si el control ya reveló, el servidor responde invalid_transition: no hay nada que mostrarle a la sala.

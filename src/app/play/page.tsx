@@ -1,8 +1,8 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { ensureSession } from '@/lib/supabase'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ensureSession, supabase } from '@/lib/supabase'
 import { errorMessage, rpc, useGame, useQuestion, useRemaining, type Standing } from '@/lib/game'
 import { OptionButton, OptionGrid } from '@/components/OptionButton'
 import Avatar, { AVATARS, type AvatarId } from '@/components/Avatar'
@@ -40,11 +40,15 @@ function Play() {
     ensureSession()
       .then(async () => {
         const c = (params.get('code') ?? '').toUpperCase()
+        // El código de la URL puede cambiar sin recargar (pasar al quiz siguiente).
+        setCode(c)
         if (c) {
           try {
             await rpc('get_my_standing', { p_code: c })
             setJoined(c)
-          } catch { /* aún no se unió */ }
+          } catch {
+            setJoined(null) // aún no se unió: formulario de la sala
+          }
         }
       })
       .catch(() => setError('No pudimos conectarnos. Revisá tu conexión.'))
@@ -67,7 +71,8 @@ function Play() {
   }
 
   if (!ready) return <Status>Conectando…</Status>
-  if (joined) return <PlayGame code={joined} />
+  // key: al pasar a otra partida, el juego arranca de cero.
+  if (joined) return <PlayGame key={joined} code={joined} />
 
   return (
     <div className="field grid place-items-center px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-16">
@@ -249,7 +254,41 @@ function PlayGame({ code }: { code: string }) {
             <p className="font-bold">{standing.score} puntos</p>
           </section>
         )}
+        {phase === 'finished' && game.next_game_id && standing && <NextGame gameId={game.next_game_id} standing={standing} />}
       </main>
     </div>
+  )
+}
+
+/**
+ * El anfitrión lanzó otro quiz en el mismo proyector: un toque y el jugador entra con el mismo
+ * nombre y personaje. Si no se puede (nombre tomado, sala llena), cae en el formulario de la sala nueva.
+ */
+function NextGame({ gameId, standing }: { gameId: string; standing: Standing }) {
+  const router = useRouter()
+  const [code, setCode] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    void supabase.from('games').select('code').eq('id', gameId).maybeSingle()
+      .then(({ data }) => setCode(data?.code ?? null))
+  }, [gameId])
+
+  const join = async () => {
+    if (!code) return
+    setBusy(true)
+    await rpc('join_game', { p_code: code, p_nickname: standing.nickname, p_avatar: standing.avatar }).catch(() => {})
+    // Si entró, la reconexión lo lleva directo al juego; si no, queda el formulario de la sala nueva.
+    router.push(`/play?code=${code}`)
+  }
+
+  return (
+    <section className="sticker-panel stick-in mx-auto flex w-full flex-col items-center gap-3 p-5 text-center" role="status">
+      <p className="font-display text-2xl leading-tight">¡Arranca otro quiz!</p>
+      <button className="sticker-btn" disabled={!code || busy} onClick={join}>
+        {busy ? 'Entrando…' : 'Jugar el siguiente'}
+      </button>
+      <p className="text-sm text-ink-soft">Entrás como {standing.nickname}, con tu mismo personaje.</p>
+    </section>
   )
 }
