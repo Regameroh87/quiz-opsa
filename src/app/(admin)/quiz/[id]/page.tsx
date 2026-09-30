@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Logo from '@/components/Logo'
 import { SHAPES } from '@/components/OptionButton'
-import { uploadQuestionImage } from '@/lib/image'
+import { deleteQuestionImages, uploadQuestionImage } from '@/lib/image'
 
 interface Q { id: string; text: string; image_url: string | null; options: string[]; correct_index: number; time_limit_s: number }
 
@@ -24,6 +24,8 @@ export default function QuizEditor() {
   const [addedId, setAddedId] = useState<string | null>(null)
   // Preguntas con una imagen subiéndose: mientras haya alguna, no se puede guardar.
   const [uploading, setUploading] = useState<string[]>([])
+  // Imágenes del quiz tal como está guardado: las que se quiten se borran del bucket recién al guardar.
+  const savedImages = useRef<string[]>([])
   const [imageError, setImageError] = useState<{ qid: string; message: string } | null>(null)
 
   useEffect(() => {
@@ -33,7 +35,10 @@ export default function QuizEditor() {
       supabase.from('questions').select('id, text, image_url, options, correct_index, time_limit_s').eq('quiz_id', id).order('position'),
     ]).then(([quiz, qs]) => {
       if (quiz.data) setTitle(quiz.data.title)
-      if (qs.data?.length) setQuestions(qs.data as Q[])
+      if (qs.data?.length) {
+        setQuestions(qs.data as Q[])
+        savedImages.current = qs.data.map((q) => q.image_url).filter(Boolean)
+      }
       setLoaded(true)
     })
   }, [id])
@@ -55,7 +60,10 @@ export default function QuizEditor() {
     setUploading((u) => [...u, qid])
     try {
       const url = await uploadQuestionImage(file)
+      // "Cambiar": la anterior se borra (el servidor la conserva si el quiz guardado la usa).
+      const previous = questions.find((q) => q.id === qid)?.image_url ?? null
       setQuestions((qs) => qs.map((q) => (q.id === qid ? { ...q, image_url: url } : q)))
+      deleteQuestionImages([previous])
     } catch {
       setImageError({ qid, message: 'No se pudo subir la imagen. Probá con otra o intentá de nuevo.' })
     } finally {
@@ -89,6 +97,9 @@ export default function QuizEditor() {
       const { error: de } = await supabase.from('questions').delete().eq('quiz_id', quizId)
         .not('id', 'in', `(${rows.map((r) => r.id).join(',')})`)
       if (de) throw de
+      // Ya guardado: se borran las imágenes que el quiz dejó de usar.
+      const kept = new Set(rows.map((r) => r.image_url))
+      deleteQuestionImages(savedImages.current.filter((u) => !kept.has(u)))
       router.push('/')
     } catch {
       setError('No se pudo guardar. Intentá de nuevo.')
@@ -137,7 +148,7 @@ export default function QuizEditor() {
 
                 <QuestionImage url={q.image_url} busy={uploading.includes(q.id)}
                   error={imageError?.qid === q.id ? imageError.message : ''}
-                  onPick={(file) => void attachImage(q.id, file)} onRemove={() => update(i, { image_url: null })} />
+                  onPick={(file) => void attachImage(q.id, file)} onRemove={() => { deleteQuestionImages([q.image_url]); update(i, { image_url: null }) }} />
 
                 <div className="flex flex-col gap-2">
                   <p className="sticker-label">Opciones · marcá la correcta</p>
@@ -176,7 +187,7 @@ export default function QuizEditor() {
                     <button type="button" className={ICON_BTN} onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Subir pregunta ${i + 1}`}>↑</button>
                     <button type="button" className={ICON_BTN} onClick={() => move(i, 1)} disabled={i === questions.length - 1} aria-label={`Bajar pregunta ${i + 1}`}>↓</button>
                     <button type="button" className="quiet-link" disabled={questions.length === 1}
-                      onClick={() => setQuestions((qs) => qs.filter((_, j) => j !== i))}>Quitar</button>
+                      onClick={() => { deleteQuestionImages([q.image_url]); setQuestions((qs) => qs.filter((_, j) => j !== i)) }}>Quitar</button>
                   </div>
                 </div>
               </fieldset>

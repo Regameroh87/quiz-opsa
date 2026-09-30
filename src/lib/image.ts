@@ -4,6 +4,11 @@ import { supabase } from '@/lib/supabase'
 const MAX_SIDE = 1600
 const QUALITY = 0.82
 
+async function authHeader() {
+  const { data } = await supabase.auth.getSession()
+  return { authorization: `Bearer ${data.session?.access_token ?? ''}` }
+}
+
 /** Achica la imagen y la pasa a WebP en el navegador, antes de subirla. */
 async function optimize(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file)
@@ -21,14 +26,22 @@ async function optimize(file: File): Promise<Blob> {
 /** Optimiza y sube la imagen de una pregunta a R2; devuelve su URL pública. */
 export async function uploadQuestionImage(file: File): Promise<string> {
   const body = await optimize(file)
-  const { data } = await supabase.auth.getSession()
-  const res = await fetch('/api/upload', {
-    method: 'POST',
-    headers: { authorization: `Bearer ${data.session?.access_token ?? ''}` },
-  })
+  const res = await fetch('/api/upload', { method: 'POST', headers: await authHeader() })
   if (!res.ok) throw new Error('sign_failed')
   const { uploadUrl, publicUrl } = (await res.json()) as { uploadUrl: string; publicUrl: string }
   const put = await fetch(uploadUrl, { method: 'PUT', headers: { 'content-type': 'image/webp' }, body })
   if (!put.ok) throw new Error('upload_failed')
   return publicUrl
+}
+
+/**
+ * Borra del bucket las imágenes que ya no usa ninguna pregunta guardada (el servidor saltea las que siguen en uso).
+ * Es limpieza: si falla, la imagen queda huérfana en R2 pero no se rompe nada, así que no se reporta.
+ */
+export function deleteQuestionImages(urls: (string | null)[]) {
+  const list = urls.filter((u): u is string => !!u)
+  if (!list.length) return
+  void authHeader()
+    .then((headers) => fetch('/api/upload', { method: 'DELETE', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ urls: list }) }))
+    .catch(() => {})
 }
