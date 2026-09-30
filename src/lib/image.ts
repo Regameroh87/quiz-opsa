@@ -53,7 +53,7 @@ export async function uploadQuestionImage(file: File): Promise<string> {
     headers: { ...(await authHeader()), 'content-type': 'application/json' },
     body: JSON.stringify({ type: body.type }),
   })
-  if (!res.ok) throw new Error('sign_failed')
+  if (!res.ok) throw new Error((await res.text()) === 'not_configured' ? 'not_configured' : 'sign_failed')
   const { uploadUrl, publicUrl } = (await res.json()) as { uploadUrl: string; publicUrl: string }
   const put = await fetch(uploadUrl, { method: 'PUT', headers: { 'content-type': body.type }, body })
   if (!put.ok) throw new Error('upload_failed')
@@ -66,6 +66,7 @@ export function imageErrorMessage(e: unknown) {
   if (code === 'unsupported_format') {
     return 'Este navegador no puede leer ese formato de foto (suele ser HEIC). Probá con una captura de pantalla de la foto, o configurá la cámara en JPG.'
   }
+  if (code === 'not_configured') return 'Falta configurar el almacenamiento de imágenes (variables R2_* en Vercel). Avisale al administrador.'
   if (code === 'sign_failed') return 'No tenés permiso para subir imágenes o se cerró tu sesión. Volvé a entrar e intentá de nuevo.'
   return 'No se pudo subir la imagen. Revisá la conexión y probá de nuevo.'
 }

@@ -24,6 +24,9 @@ function bucket() {
 
 export async function POST(req: Request) {
   if (!(await adminDb(req))) return new Response('forbidden', { status: 403 })
+  // Sin las variables de R2 se firmaría contra una URL inválida y el navegador fallaría sin explicación.
+  const env = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'NEXT_PUBLIC_R2_PUBLIC_URL']
+  if (env.some((name) => !process.env[name])) return new Response('not_configured', { status: 500 })
   // Sin cuerpo (versión anterior del editor): WebP.
   const { type = 'image/webp' } = (await req.json().catch(() => ({}))) as { type?: string }
   if (!Object.hasOwn(TYPES, type)) return new Response('bad_request', { status: 400 })
