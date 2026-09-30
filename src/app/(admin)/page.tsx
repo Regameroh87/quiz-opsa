@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { errorMessage, QUIZ_LIMIT, rpc, type Game, type Phase } from '@/lib/game'
 import Logo from '@/components/Logo'
+import AccountMenu from '@/components/AccountMenu'
 import PageTransition from '@/components/PageTransition'
 import { deleteQuestionImages } from '@/lib/image'
 
@@ -140,12 +141,12 @@ function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () 
   )
 }
 
-/** Encabezado: marca, quién está logueado en la notebook compartida, cómo salir y "Nuevo quiz". */
+/** Encabezado: marca, "Nuevo quiz" y el menú de la cuenta (quién está logueado en la notebook compartida, contraseña, socios, salir). */
 function AdminHeader({ liveCount, quizCount }: { liveCount: number; quizCount: number }) {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'admin' | 'user' | null>(null)
   const [confirming, setConfirming] = useState(false)
-  // Al cancelar, el foco vuelve a "Cerrar sesión" en vez de perderse en <body>.
+  // Al cancelar, el foco vuelve al avatar de la cuenta en vez de perderse en <body>.
   const [cancelled, setCancelled] = useState(false)
   const cancel = () => { setConfirming(false); setCancelled(true) }
   useEffect(() => {
@@ -158,23 +159,16 @@ function AdminHeader({ liveCount, quizCount }: { liveCount: number; quizCount: n
 
   return (
     <>
-      {/* El orden del DOM es el visual. En el celular cada bloque tiene su línea: logo, mail completo, y abajo los botones. */}
-      <header className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="w-full sm:w-auto"><Logo height={36} /></div>
-        <span className="w-full min-w-0 break-all text-ink-soft sm:w-auto sm:flex-1 sm:truncate sm:text-right" title={email}>{email}</span>
-        {/* Salir con una partida abierta corta la pantalla del host: se confirma primero. */}
-        <button className={`${QUIET} shrink-0`} key={cancelled ? 'returned' : 'initial'} autoFocus={cancelled}
-          aria-expanded={confirming} aria-controls="signout-confirm"
-          onClick={() => (liveCount > 0 ? setConfirming(true) : signOut())}>
-          Cerrar sesión
-        </button>
-        <Link className={`${QUIET} shrink-0`} href="/cuenta" transitionTypes={['nav-forward']}>Cambiar contraseña</Link>
-        <div className="ml-auto flex shrink-0 items-center gap-3">
-          {role === 'admin' && <Link className={QUIET} href="/socios" transitionTypes={['nav-forward']}>Agregar socio</Link>}
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+        <Logo height={36} />
+        <div className="flex items-center gap-3">
           {/* Un usuario común ve solo sus quizzes, así que la cantidad de la lista es la suya. */}
           {role === 'user' && quizCount >= QUIZ_LIMIT
             ? <span className="text-ink-soft">Límite de {QUIZ_LIMIT} quizzes</span>
             : <Link className="sticker-btn-ghost sticker-btn-sm" href="/quiz/new" transitionTypes={['nav-forward']}>Nuevo quiz</Link>}
+          {/* Salir con una partida abierta corta la pantalla del host: se confirma primero. */}
+          <AccountMenu key={cancelled ? 'returned' : 'initial'} autoFocus={cancelled} email={email} isAdmin={role === 'admin'}
+            onSignOut={() => (liveCount > 0 ? setConfirming(true) : signOut())} />
         </div>
       </header>
 

@@ -6,22 +6,63 @@ import { createClient } from '@supabase/supabase-js'
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD = 8
 
-/** ¿El pedido viene de una sesión con rol admin? (RLS de `admins` deja a cada uno leer solo su fila) */
-async function callerIsAdmin(req: Request) {
+/** Id del usuario si el pedido viene de una sesión con rol admin, o null. (RLS de `admins` deja a cada uno leer solo su fila) */
+async function adminCallerId(req: Request) {
   const token = req.headers.get('authorization')?.replace(/^Bearer /, '')
-  if (!token) return false
+  if (!token) return null
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false },
   })
   const { data: user } = await db.auth.getUser(token)
-  if (!user.user || user.user.is_anonymous) return false
+  if (!user.user || user.user.is_anonymous) return null
   const { data: row } = await db.from('admins').select('role').maybeSingle()
-  return row?.role === 'admin'
+  return row?.role === 'admin' ? user.user.id : null
+}
+
+function serviceClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceKey) return null
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+// Lista las cuentas del panel: email, rol, último ingreso y cuántos quizzes armó cada una.
+export async function GET(req: Request) {
+  if (!(await adminCallerId(req))) return new Response('forbidden', { status: 403 })
+  const service = serviceClient()
+  if (!service) return new Response('not_configured', { status: 500 })
+
+  const [members, quizzes, users] = await Promise.all([
+    service.from('admins').select('user_id, role'),
+    service.from('quizzes').select('created_by'),
+    service.auth.admin.listUsers({ perPage: 1000 }),
+  ])
+  if (members.error || quizzes.error || users.error) return new Response('list_failed', { status: 500 })
+
+  const quizCount = new Map<string, number>()
+  for (const q of quizzes.data) if (q.created_by) quizCount.set(q.created_by, (quizCount.get(q.created_by) ?? 0) + 1)
+  const byId = new Map(users.data.users.map((u) => [u.id, u]))
+
+  const list = members.data
+    .map((m) => {
+      const u = byId.get(m.user_id)
+      return {
+        id: m.user_id,
+        email: u?.email ?? '',
+        role: m.role as 'admin' | 'user',
+        quizzes: quizCount.get(m.user_id) ?? 0,
+        createdAt: u?.created_at ?? '',
+        lastSignInAt: u?.last_sign_in_at ?? null,
+      }
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return Response.json({ members: list })
 }
 
 export async function POST(req: Request) {
-  if (!(await callerIsAdmin(req))) return new Response('forbidden', { status: 403 })
+  if (!(await adminCallerId(req))) return new Response('forbidden', { status: 403 })
 
   const body = (await req.json().catch(() => ({}))) as { email?: unknown; password?: unknown }
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
@@ -29,11 +70,8 @@ export async function POST(req: Request) {
   if (!EMAIL.test(email)) return new Response('invalid_email', { status: 400 })
   if (password.length < MIN_PASSWORD) return new Response('weak_password', { status: 400 })
 
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!serviceKey) return new Response('not_configured', { status: 500 })
-  const service = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+  const service = serviceClient()
+  if (!service) return new Response('not_configured', { status: 500 })
 
   const { data, error } = await service.auth.admin.createUser({ email, password, email_confirm: true })
   if (error || !data.user) {
@@ -46,4 +84,60 @@ export async function POST(req: Request) {
     return new Response('create_failed', { status: 500 })
   }
   return Response.json({ email })
+}
+
+type Body = { id?: unknown; email?: unknown; password?: unknown; role?: unknown }
+
+/**
+ * Común a PATCH y DELETE: valida al admin, el id y que sea una cuenta del panel distinta de la propia
+ * (un admin no se borra ni se baja el rol a sí mismo: podría dejar el panel sin admins).
+ */
+async function target(req: Request) {
+  const callerId = await adminCallerId(req)
+  if (!callerId) return { error: new Response('forbidden', { status: 403 }) }
+  const service = serviceClient()
+  if (!service) return { error: new Response('not_configured', { status: 500 }) }
+  const body = (await req.json().catch(() => ({}))) as Body
+  if (typeof body.id !== 'string') return { error: new Response('bad_request', { status: 400 }) }
+  if (body.id === callerId) return { error: new Response('self', { status: 400 }) }
+  const { data: member } = await service.from('admins').select('role').eq('user_id', body.id).maybeSingle()
+  if (!member) return { error: new Response('not_found', { status: 404 }) }
+  return { service, body, id: body.id, member }
+}
+
+// Edita email, contraseña y/o rol. Lo que no viene, no se toca.
+export async function PATCH(req: Request) {
+  const t = await target(req)
+  if (t.error) return t.error
+  const { service, body, id, member } = t
+
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : undefined
+  const password = typeof body.password === 'string' && body.password !== '' ? body.password : undefined
+  const role = body.role === 'admin' || body.role === 'user' ? body.role : undefined
+  if (email !== undefined && !EMAIL.test(email)) return new Response('invalid_email', { status: 400 })
+  if (password !== undefined && password.length < MIN_PASSWORD) return new Response('weak_password', { status: 400 })
+
+  const roleChanged = role !== undefined && role !== member.role
+  if (roleChanged) {
+    const { error } = await service.from('admins').update({ role }).eq('user_id', id)
+    if (error) return new Response('update_failed', { status: 500 })
+  }
+  if (email !== undefined || password !== undefined) {
+    const { error } = await service.auth.admin.updateUserById(id, { email, password, email_confirm: true })
+    if (error) {
+      // Cambio a medias: se deshace el rol para que la cuenta no quede a medio editar.
+      if (roleChanged) await service.from('admins').update({ role: member.role }).eq('user_id', id)
+      return new Response(error.code === 'email_exists' ? 'email_taken' : 'update_failed', { status: error.code === 'email_exists' ? 409 : 500 })
+    }
+  }
+  return Response.json({ ok: true })
+}
+
+// Borra la cuenta. `admins` y sus partidas se van con ella; sus quizzes quedan sin dueño (solo los ven los admin).
+export async function DELETE(req: Request) {
+  const t = await target(req)
+  if (t.error) return t.error
+  const { error } = await t.service.auth.admin.deleteUser(t.id)
+  if (error) return new Response('delete_failed', { status: 500 })
+  return Response.json({ ok: true })
 }
