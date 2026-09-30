@@ -8,9 +8,15 @@ import Logo from '@/components/Logo'
 import { SHAPES } from '@/components/OptionButton'
 import { deleteQuestionImages, uploadQuestionImage } from '@/lib/image'
 
-interface Q { id: string; text: string; image_url: string | null; options: string[]; correct_index: number; time_limit_s: number }
+interface Q {
+  id: string; text: string; image_url: string | null; options: string[]; correct_index: number; time_limit_s: number
+  // Se muestran recién al revelar la respuesta.
+  reveal_image_url: string | null; reveal_text: string | null
+}
+type ImageField = 'image_url' | 'reveal_image_url'
+const imageKey = (qid: string, field: ImageField) => `${qid}:${field}`
 
-const blank = (): Q => ({ id: crypto.randomUUID(), text: '', image_url: null, options: ['', '', '', ''], correct_index: 0, time_limit_s: 20 })
+const blank = (): Q => ({ id: crypto.randomUUID(), text: '', image_url: null, options: ['', '', '', ''], correct_index: 0, time_limit_s: 20, reveal_image_url: null, reveal_text: null })
 
 export default function QuizEditor() {
   const { id } = useParams<{ id: string }>()
@@ -22,22 +28,22 @@ export default function QuizEditor() {
   const [saving, setSaving] = useState(false)
   // Pregunta recién agregada: recibe el foco para escribir sin buscarla.
   const [addedId, setAddedId] = useState<string | null>(null)
-  // Preguntas con una imagen subiéndose: mientras haya alguna, no se puede guardar.
+  // Imágenes subiéndose (clave imageKey): mientras haya alguna, no se puede guardar.
   const [uploading, setUploading] = useState<string[]>([])
   // Imágenes del quiz tal como está guardado: las que se quiten se borran del bucket recién al guardar.
   const savedImages = useRef<string[]>([])
-  const [imageError, setImageError] = useState<{ qid: string; message: string } | null>(null)
+  const [imageError, setImageError] = useState<{ key: string; message: string } | null>(null)
 
   useEffect(() => {
     if (id === 'new') return
     Promise.all([
       supabase.from('quizzes').select('title').eq('id', id).single(),
-      supabase.from('questions').select('id, text, image_url, options, correct_index, time_limit_s').eq('quiz_id', id).order('position'),
+      supabase.from('questions').select('id, text, image_url, options, correct_index, time_limit_s, reveal_image_url, reveal_text').eq('quiz_id', id).order('position'),
     ]).then(([quiz, qs]) => {
       if (quiz.data) setTitle(quiz.data.title)
       if (qs.data?.length) {
         setQuestions(qs.data as Q[])
-        savedImages.current = qs.data.map((q) => q.image_url).filter(Boolean)
+        savedImages.current = qs.data.flatMap((q) => [q.image_url, q.reveal_image_url]).filter(Boolean)
       }
       setLoaded(true)
     })
@@ -55,19 +61,30 @@ export default function QuizEditor() {
     })
 
   // Se identifica por id (no por índice): la pregunta puede moverse mientras sube.
-  const attachImage = async (qid: string, file: File) => {
+  const attachImage = async (qid: string, field: ImageField, file: File) => {
+    const key = imageKey(qid, field)
     setImageError(null)
-    setUploading((u) => [...u, qid])
+    setUploading((u) => [...u, key])
     try {
       const url = await uploadQuestionImage(file)
       // "Cambiar": la anterior se borra (el servidor la conserva si el quiz guardado la usa).
-      const previous = questions.find((q) => q.id === qid)?.image_url ?? null
-      setQuestions((qs) => qs.map((q) => (q.id === qid ? { ...q, image_url: url } : q)))
+      const previous = questions.find((q) => q.id === qid)?.[field] ?? null
+      setQuestions((qs) => qs.map((q) => (q.id === qid ? { ...q, [field]: url } : q)))
       deleteQuestionImages([previous])
     } catch {
-      setImageError({ qid, message: 'No se pudo subir la imagen. Probá con otra o intentá de nuevo.' })
+      setImageError({ key, message: 'No se pudo subir la imagen. Probá con otra o intentá de nuevo.' })
     } finally {
-      setUploading((u) => u.filter((x) => x !== qid))
+      setUploading((u) => u.filter((x) => x !== key))
+    }
+  }
+  const imageProps = (q: Q, i: number, field: ImageField) => {
+    const key = imageKey(q.id, field)
+    return {
+      url: q[field],
+      busy: uploading.includes(key),
+      error: imageError?.key === key ? imageError.message : '',
+      onPick: (file: File) => void attachImage(q.id, field, file),
+      onRemove: () => { deleteQuestionImages([q[field]]); update(i, { [field]: null }) },
     }
   }
 
@@ -79,7 +96,7 @@ export default function QuizEditor() {
       const options = q.options.map((o) => o.trim())
       // Al quitar opciones vacías, la correcta se reubica por cuántas opciones llenas la preceden.
       const correct_index = options.slice(0, q.correct_index).filter(Boolean).length
-      return { ...q, options: options.filter(Boolean), correct_index: options[q.correct_index] ? correct_index : 99 }
+      return { ...q, reveal_text: q.reveal_text?.trim() || null, options: options.filter(Boolean), correct_index: options[q.correct_index] ? correct_index : 99 }
     })
     const bad = cleaned.findIndex((q) => !q.text.trim() || q.options.length < 2 || q.correct_index >= q.options.length)
     if (bad >= 0) return setError(`Revisá la pregunta ${bad + 1}: necesita texto, al menos 2 opciones y una correcta válida.`)
@@ -98,7 +115,7 @@ export default function QuizEditor() {
         .not('id', 'in', `(${rows.map((r) => r.id).join(',')})`)
       if (de) throw de
       // Ya guardado: se borran las imágenes que el quiz dejó de usar.
-      const kept = new Set(rows.map((r) => r.image_url))
+      const kept = new Set(rows.flatMap((r) => [r.image_url, r.reveal_image_url]))
       deleteQuestionImages(savedImages.current.filter((u) => !kept.has(u)))
       router.push('/')
     } catch {
@@ -146,9 +163,7 @@ export default function QuizEditor() {
                     autoFocus={q.id === addedId} onChange={(e) => update(i, { text: e.target.value })} />
                 </label>
 
-                <QuestionImage url={q.image_url} busy={uploading.includes(q.id)}
-                  error={imageError?.qid === q.id ? imageError.message : ''}
-                  onPick={(file) => void attachImage(q.id, file)} onRemove={() => { deleteQuestionImages([q.image_url]); update(i, { image_url: null }) }} />
+                <QuestionImage label="Imagen (opcional)" {...imageProps(q, i, 'image_url')} />
 
                 <div className="flex flex-col gap-2">
                   <p className="sticker-label">Opciones · marcá la correcta</p>
@@ -174,6 +189,17 @@ export default function QuizEditor() {
                   </div>
                 </div>
 
+                {/* Lo que aparece recién al revelar: la foto del personaje, un dato, por qué es la correcta. */}
+                <div className="flex flex-col gap-3 rounded-2xl border-[3px] border-dashed border-ink-soft/40 p-4">
+                  <p className="font-display text-lg text-brand">Al revelar la respuesta</p>
+                  <label className="sticker-label">
+                    Explicación (opcional)
+                    <textarea className="sticker-input resize-none" rows={2} maxLength={500} placeholder="Ej.: Es el T7 porque…"
+                      value={q.reveal_text ?? ''} onChange={(e) => update(i, { reveal_text: e.target.value })} />
+                  </label>
+                  <QuestionImage label="Imagen de la respuesta (opcional)" {...imageProps(q, i, 'reveal_image_url')} />
+                </div>
+
                 <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
                   <label className="sticker-label">
                     Tiempo
@@ -187,7 +213,7 @@ export default function QuizEditor() {
                     <button type="button" className={ICON_BTN} onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Subir pregunta ${i + 1}`}>↑</button>
                     <button type="button" className={ICON_BTN} onClick={() => move(i, 1)} disabled={i === questions.length - 1} aria-label={`Bajar pregunta ${i + 1}`}>↓</button>
                     <button type="button" className="quiet-link" disabled={questions.length === 1}
-                      onClick={() => { deleteQuestionImages([q.image_url]); setQuestions((qs) => qs.filter((_, j) => j !== i)) }}>Quitar</button>
+                      onClick={() => { deleteQuestionImages([q.image_url, q.reveal_image_url]); setQuestions((qs) => qs.filter((_, j) => j !== i)) }}>Quitar</button>
                   </div>
                 </div>
               </fieldset>
@@ -223,8 +249,8 @@ const TILTS = ['0.5deg', '-0.5deg', '0.3deg', '-0.7deg']
 const ICON_BTN = 'sticker-btn-ghost sticker-btn-sm size-11 p-0'
 
 // Imagen opcional de la pregunta: se elige, se optimiza y se sube al momento.
-function QuestionImage({ url, busy, error, onPick, onRemove }: {
-  url: string | null; busy: boolean; error: string; onPick: (file: File) => void; onRemove: () => void
+function QuestionImage({ label, url, busy, error, onPick, onRemove }: {
+  label: string; url: string | null; busy: boolean; error: string; onPick: (file: File) => void; onRemove: () => void
 }) {
   const input = (
     <input type="file" accept="image/*" className="sr-only"
@@ -232,7 +258,7 @@ function QuestionImage({ url, busy, error, onPick, onRemove }: {
   )
   return (
     <div className="flex flex-col gap-2">
-      <p className="sticker-label">Imagen (opcional)</p>
+      <p className="sticker-label">{label}</p>
       {url ? (
         <div className="flex flex-wrap items-end gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2 */}

@@ -58,9 +58,11 @@ export async function DELETE(req: Request) {
   if (!candidates.length) return Response.json({ deleted: 0 })
 
   // Nunca se borra una imagen que alguna pregunta guardada todavía usa: el que llama no tiene que adivinarlo.
-  const { data: used, error } = await db.from('questions').select('image_url').in('image_url', candidates)
+  const list = candidates.map((u) => `"${u}"`).join(',')
+  const { data: used, error } = await db.from('questions').select('image_url, reveal_image_url')
+    .or(`image_url.in.(${list}),reveal_image_url.in.(${list})`)
   if (error) return new Response('db_error', { status: 500 })
-  const inUse = new Set(used.map((r) => r.image_url))
+  const inUse = new Set(used.flatMap((r) => [r.image_url, r.reveal_image_url]))
   const orphans = candidates.filter((u) => !inUse.has(u))
 
   const { r2, objectUrl } = bucket()

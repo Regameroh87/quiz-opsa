@@ -176,6 +176,16 @@ function PlayGame({ code }: { code: string }) {
           <p>Vas en el puesto <strong>#{standing.rank}</strong></p>
         </div>
       )}
+      {/* Lo mismo que muestra la pantalla al revelar, por si el proyector no se ve bien. */}
+      {phase === 'reveal' && q && (q.data.reveal_image_url || q.data.reveal_text) && (
+        <div className="card">
+          {q.data.reveal_image_url && (
+            // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
+            <img src={q.data.reveal_image_url} alt="" className="mx-auto max-h-[35vh] w-auto rounded-card object-contain" />
+          )}
+          {q.data.reveal_text && <p className="whitespace-pre-line">{q.data.reveal_text}</p>}
+        </div>
+      )}
 
       {phase === 'finished' && standing && (
         <div className="card text-center">

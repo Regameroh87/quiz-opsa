@@ -283,14 +283,14 @@ export default function QuizList() {
     setConfirming(null)
     setBusy({ quizId: q.id, action: 'remove' })
     // Se leen antes de borrar: el cascade se lleva las preguntas y con ellas las URLs.
-    const { data: images } = await supabase.from('questions').select('image_url').eq('quiz_id', q.id).not('image_url', 'is', null)
+    const { data: images } = await supabase.from('questions').select('image_url, reveal_image_url').eq('quiz_id', q.id)
     const { error } = await supabase.from('quizzes').delete().eq('id', q.id)
     setBusy(null)
     if (error) {
       setCardError({ quizId: q.id, message: 'No se pudo borrar. Revisá tu conexión e intentá de nuevo.' })
       return
     }
-    deleteQuestionImages(images?.map((r) => r.image_url) ?? [])
+    deleteQuestionImages(images?.flatMap((r) => [r.image_url, r.reveal_image_url]) ?? [])
     // Borrar el quiz se lleva sus partidas (on delete cascade): también se refresca la franja de partidas en curso.
     void load()
     void fetchLiveGames().then(setLive)

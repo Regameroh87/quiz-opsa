@@ -128,9 +128,10 @@ export default function Host() {
             )}
           </div>
           <h1>{q.data.text}</h1>
-          {q.data.image_url && (
+          {/* Al revelar, la imagen de la respuesta (si hay) reemplaza a la de la pregunta. */}
+          {(q.data.reveal_image_url ?? q.data.image_url) && (
             // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
-            <img src={q.data.image_url} alt="" className="mx-auto max-h-[40vh] w-auto rounded-card object-contain" />
+            <img src={(q.data.reveal_image_url ?? q.data.image_url)!} alt="" className="mx-auto max-h-[40vh] w-auto rounded-card object-contain" />
           )}
           <OptionGrid large>
             {q.data.options.map((o, i) => (
@@ -141,6 +142,9 @@ export default function Host() {
                 total={phase === 'reveal' ? Math.max(1, stats.reduce((a, b) => a + b, 0)) : undefined} large />
             ))}
           </OptionGrid>
+          {phase === 'reveal' && q.data.reveal_text && (
+            <p className="card whitespace-pre-line text-[1.4em] font-semibold">{q.data.reveal_text}</p>
+          )}
           <div className={ACTIONS}>
             {/* A la izquierda: lejos del lugar donde estaban "Empezar" y "Siguiente pregunta". */}
             {phase === 'question' && (

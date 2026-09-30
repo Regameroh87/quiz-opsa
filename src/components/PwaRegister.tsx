@@ -35,6 +35,14 @@ export default function PwaRegister() {
       return
     }
 
+    // En desarrollo el SW serviría JS/CSS viejos desde caché (Next reutiliza los nombres de los chunks):
+    // se desinstala y se limpia su caché para que los cambios se vean al recargar.
+    if (process.env.NODE_ENV !== 'production') {
+      void navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => void r.unregister()))
+      void caches.keys().then((keys) => keys.forEach((k) => void caches.delete(k)))
+      return
+    }
+
     const registerSW = async () => {
       try {
         const reg = await navigator.serviceWorker.register('/sw.js', {

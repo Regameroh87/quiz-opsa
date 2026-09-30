@@ -24,6 +24,9 @@ export interface CurrentQuestion {
   question_started_at: string
   server_now: string
   correct_index: number | null
+  // Solo llegan desde el reveal.
+  reveal_image_url: string | null
+  reveal_text: string | null
 }
 
 export interface Standing {
