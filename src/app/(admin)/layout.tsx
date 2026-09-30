@@ -28,20 +28,63 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => data.subscription.unsubscribe()
   }, [])
 
-  if (state.status === 'loading') return <main className="page justify-center text-center"><p className="text-muted" role="status">Cargando…</p></main>
+  if (state.status === 'loading') {
+    return (
+      <Stage>
+        <p className="font-display text-4xl text-brand" role="status">Cargando…</p>
+      </Stage>
+    )
+  }
   if (state.status === 'out') return <Login />
   if (state.status === 'forbidden') {
     return (
-      <main className="page items-center justify-center text-center">
-        <Logo height={44} />
-        <p className="text-bad">
-          {state.email ? <><strong className="break-all">{state.email}</strong> no tiene</> : 'Tu usuario no tiene'} permisos de administrador.
-        </p>
-        <button className="btn-secondary" onClick={() => void supabase.auth.signOut()}>Entrar con otra cuenta</button>
-      </main>
+      <Stage>
+        <Card title="Sin permisos">
+          <p className="mb-6 text-ink-soft">
+            {state.email ? <><strong className="break-all text-white">{state.email}</strong> no tiene</> : 'Tu usuario no tiene'} permisos de administrador. Pedile acceso a alguien del equipo.
+          </p>
+          <button className="sticker-btn-ghost" onClick={() => void supabase.auth.signOut()}>Entrar con otra cuenta</button>
+        </Card>
+      </Stage>
     )
   }
   return children
+}
+
+// Las mascotas son stickers pegados en las esquinas del campo; decorativas (aria-hidden).
+// En el celular quedan solo las dos de arriba, más chicas.
+const MASCOTS = [
+  { src: '/mascotas/tractor.webp', w: 720, h: 393, className: 'left-[5%] top-[10%] w-[300px] max-md:left-[-4%] max-md:top-[3%] max-md:w-[150px]', tilt: '-8deg', delay: 100 },
+  { src: '/mascotas/cosechadora.webp', w: 720, h: 393, className: 'right-[6%] top-[8%] w-[260px] max-md:right-[-4%] max-md:top-[2%] max-md:w-[150px]', tilt: '7deg', delay: 220 },
+  { src: '/mascotas/pulverizadora.webp', w: 720, h: 720, className: 'left-[8%] bottom-[8%] w-[250px] max-md:hidden', tilt: '5deg', delay: 340 },
+  { src: '/mascotas/tt4.webp', w: 720, h: 720, className: 'right-[5%] bottom-[9%] w-[280px] max-md:hidden', tilt: '-6deg', delay: 460 },
+] as const
+
+function Stage({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="field relative grid place-items-center overflow-hidden px-4 pb-14 pt-[max(2.5rem,env(safe-area-inset-top))] max-md:pt-32">
+      {MASCOTS.map((m) => (
+        <div key={m.src} aria-hidden className={`sticker-tile stick-in ${m.className}`} style={{ '--tilt': m.tilt, '--delay': `${m.delay}ms` } as React.CSSProperties}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- decorativa, ancho fluido por CSS */}
+          <img src={m.src} width={m.w} height={m.h} alt="" draggable={false} />
+        </div>
+      ))}
+      {children}
+    </main>
+  )
+}
+
+function Card({ title, children, onSubmit }: { title: string; children: React.ReactNode; onSubmit?: (e: React.FormEvent) => void }) {
+  const body = (
+    <>
+      <div className="flex justify-center"><Logo height={38} /></div>
+      <h1 className="sticker-title mb-1 mt-3.5">{title}</h1>
+      {children}
+    </>
+  )
+  return onSubmit
+    ? <form className="sticker-card" onSubmit={onSubmit}>{body}</form>
+    : <section className="sticker-card">{body}</section>
 }
 
 function Login() {
@@ -64,22 +107,23 @@ function Login() {
   }
 
   return (
-    <main className="page items-center justify-center text-center">
-      <Logo height={44} />
-      <h1>Admin</h1>
-      <form className="card w-full" onSubmit={submit}>
-        <label className="text-left">
-          Email
-          <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />
-        </label>
-        <label className="text-left">
-          Contraseña
-          <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
-        </label>
-        {/* Espacio reservado: el formulario no salta cuando aparece el error. */}
-        <p className="min-h-6 text-bad" role="alert">{error}</p>
-        <button className="btn" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
-      </form>
-    </main>
+    <Stage>
+      <Card title="¡Armá el quiz!" onSubmit={submit}>
+        <p className="mb-[22px] font-bold text-ink-soft">Entrá para crear partidas y llevarlas a la pantalla.</p>
+        <div className="flex flex-col gap-3.5">
+          <label className="sticker-label">
+            Email
+            <input className="sticker-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />
+          </label>
+          <label className="sticker-label">
+            Contraseña
+            <input className="sticker-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+          </label>
+          <button className="sticker-btn mt-1.5" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
+        </div>
+        {/* El error cuelga del borde de la tarjeta: el formulario no salta cuando aparece. */}
+        <div role="alert">{error && <p className="sticker-tag">{error}</p>}</div>
+      </Card>
+    </Stage>
   )
 }

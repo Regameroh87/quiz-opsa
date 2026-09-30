@@ -1,0 +1,409 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-29T23:34:08.213Z",
+  "title": "Design System: Quiz New Holland",
+  "extensions": {
+    "colorMeta": {
+      "brand": {
+        "role": "primary",
+        "displayName": "Amarillo New Holland",
+        "canonical": "#f1b514",
+        "tonalRamp": [
+          "oklch(15% 0.16 80)",
+          "oklch(26% 0.16 80)",
+          "oklch(38% 0.16 80)",
+          "oklch(49% 0.16 80)",
+          "oklch(61% 0.16 80)",
+          "oklch(72% 0.16 80)",
+          "oklch(84% 0.16 80)",
+          "oklch(95% 0.16 80)"
+        ]
+      },
+      "field": {
+        "role": "secondary",
+        "displayName": "Campo azul NH",
+        "canonical": "#1b4fc9",
+        "tonalRamp": [
+          "oklch(15% 0.2 264)",
+          "oklch(26% 0.2 264)",
+          "oklch(38% 0.2 264)",
+          "oklch(49% 0.2 264)",
+          "oklch(61% 0.2 264)",
+          "oklch(72% 0.2 264)",
+          "oklch(84% 0.2 264)",
+          "oklch(95% 0.2 264)"
+        ]
+      },
+      "navy": {
+        "role": "secondary",
+        "displayName": "Navy de tarjeta",
+        "canonical": "#00205b",
+        "tonalRamp": [
+          "oklch(15% 0.11 262)",
+          "oklch(26% 0.11 262)",
+          "oklch(38% 0.11 262)",
+          "oklch(49% 0.11 262)",
+          "oklch(61% 0.11 262)",
+          "oklch(72% 0.11 262)",
+          "oklch(84% 0.11 262)",
+          "oklch(95% 0.11 262)"
+        ]
+      },
+      "alert": {
+        "role": "tertiary",
+        "displayName": "Rojo etiqueta",
+        "canonical": "#d7263d",
+        "tonalRamp": [
+          "oklch(15% 0.2 22)",
+          "oklch(26% 0.2 22)",
+          "oklch(38% 0.2 22)",
+          "oklch(49% 0.2 22)",
+          "oklch(61% 0.2 22)",
+          "oklch(72% 0.2 22)",
+          "oklch(84% 0.2 22)",
+          "oklch(95% 0.2 22)"
+        ]
+      },
+      "opt-0": {
+        "role": "tertiary",
+        "displayName": "Opción roja",
+        "canonical": "#c9302c",
+        "tonalRamp": [
+          "oklch(15% 0.18 27)",
+          "oklch(26% 0.18 27)",
+          "oklch(38% 0.18 27)",
+          "oklch(49% 0.18 27)",
+          "oklch(61% 0.18 27)",
+          "oklch(72% 0.18 27)",
+          "oklch(84% 0.18 27)",
+          "oklch(95% 0.18 27)"
+        ]
+      },
+      "opt-1": {
+        "role": "tertiary",
+        "displayName": "Opción azul",
+        "canonical": "#2f6fe0",
+        "tonalRamp": [
+          "oklch(15% 0.18 262)",
+          "oklch(26% 0.18 262)",
+          "oklch(38% 0.18 262)",
+          "oklch(49% 0.18 262)",
+          "oklch(61% 0.18 262)",
+          "oklch(72% 0.18 262)",
+          "oklch(84% 0.18 262)",
+          "oklch(95% 0.18 262)"
+        ]
+      },
+      "opt-2": {
+        "role": "tertiary",
+        "displayName": "Opción ámbar",
+        "canonical": "#b45309",
+        "tonalRamp": [
+          "oklch(15% 0.14 50)",
+          "oklch(26% 0.14 50)",
+          "oklch(38% 0.14 50)",
+          "oklch(49% 0.14 50)",
+          "oklch(61% 0.14 50)",
+          "oklch(72% 0.14 50)",
+          "oklch(84% 0.14 50)",
+          "oklch(95% 0.14 50)"
+        ]
+      },
+      "opt-3": {
+        "role": "tertiary",
+        "displayName": "Opción verde",
+        "canonical": "#15803d",
+        "tonalRamp": [
+          "oklch(15% 0.14 150)",
+          "oklch(26% 0.14 150)",
+          "oklch(38% 0.14 150)",
+          "oklch(49% 0.14 150)",
+          "oklch(61% 0.14 150)",
+          "oklch(72% 0.14 150)",
+          "oklch(84% 0.14 150)",
+          "oklch(95% 0.14 150)"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Azul tinta suave",
+        "canonical": "#c9d8ff",
+        "tonalRamp": [
+          "oklch(15% 0.06 270)",
+          "oklch(26% 0.06 270)",
+          "oklch(38% 0.06 270)",
+          "oklch(49% 0.06 270)",
+          "oklch(61% 0.06 270)",
+          "oklch(72% 0.06 270)",
+          "oklch(84% 0.06 270)",
+          "oklch(95% 0.06 270)"
+        ]
+      },
+      "sticker-white": {
+        "role": "neutral",
+        "displayName": "Blanco troquel",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "brand-contrast": {
+        "role": "neutral",
+        "displayName": "Negro sobre amarillo",
+        "canonical": "#000000",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Título de la tarjeta-sticker, en amarillo NH; uno por pantalla."
+      },
+      "status": {
+        "displayName": "Status",
+        "purpose": "Estados de espera a pantalla completa (Cargando…) sobre el campo."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "Bajada debajo del título, en ink-soft."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Texto explicativo en la tarjeta, en ink-soft."
+      },
+      "input": {
+        "displayName": "Input",
+        "purpose": "Texto escrito en los campos, en navy."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Etiqueta de los botones-sticker."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Etiqueta de campo de formulario, mayúsculas, ink-soft. Solo para campos."
+      }
+    },
+    "shadows": [
+      {
+        "name": "canto-card",
+        "value": "0 14px 0 rgb(0 20 60 / 0.45)",
+        "purpose": "Canto sólido de la tarjeta-sticker."
+      },
+      {
+        "name": "canto-tile",
+        "value": "0 10px 0 rgb(0 20 60 / 0.35), 0 18px 30px rgb(0 0 0 / 0.25)",
+        "purpose": "Canto más despegue suave de las mascotas."
+      },
+      {
+        "name": "canto-btn-primary",
+        "value": "0 7px 0 #b3830a",
+        "purpose": "Canto del botón amarillo en reposo."
+      },
+      {
+        "name": "canto-btn-primary-pressed",
+        "value": "0 2px 0 #b3830a",
+        "purpose": "Botón amarillo apretado (con translate 0 5px)."
+      },
+      {
+        "name": "canto-btn-ghost",
+        "value": "0 7px 0 #8fa6d8",
+        "purpose": "Canto del botón blanco en reposo."
+      },
+      {
+        "name": "canto-btn-ghost-pressed",
+        "value": "0 2px 0 #8fa6d8",
+        "purpose": "Botón blanco apretado (con translate 0 5px)."
+      },
+      {
+        "name": "peel-tag",
+        "value": "0 8px 14px -4px rgb(0 10 40 / 0.5)",
+        "purpose": "Despegue suave de la etiqueta de error."
+      },
+      {
+        "name": "focus-halo-input",
+        "value": "0 0 0 4px rgb(241 181 20 / 0.4)",
+        "purpose": "Halo amarillo de foco en inputs, con borde amarillo 3px."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-stick",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Curva de todo el mundo sticker (pegado, slap, hover de mascota)."
+      },
+      {
+        "name": "stick",
+        "value": "0.7s; 0% translateY(-28px) scale(1.14) opacity 0 → 55% scale(0.97) → 100% none; stagger via --delay",
+        "purpose": "Entrada en secuencia de los stickers al cargar."
+      },
+      {
+        "name": "slap",
+        "value": "0.45s; 0% scale(1.35) rotate(6deg) opacity 0 → 60% scale(0.95) → 100% none",
+        "purpose": "Llegada de la etiqueta de error."
+      },
+      {
+        "name": "press",
+        "value": "translate 0.08s, box-shadow 0.08s",
+        "purpose": "Hundimiento del botón sobre su canto."
+      },
+      {
+        "name": "tile-lift",
+        "value": "translate/rotate 0.35s ease-stick; hover: translate 0 -8px, rotate +3deg",
+        "purpose": "Mascota se levanta al hover (solo hover: hover)."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce → sin animaciones ni transiciones de sticker",
+        "purpose": "Accesibilidad."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "md",
+        "value": "768px"
+      }
+    ],
+    "field": {
+      "background": "radial-gradient(circle at 20% 10%, #2d6cf0, transparent 50%), radial-gradient(circle at 90% 90%, #0d3fa8, transparent 50%), var(--color-field)"
+    },
+    "legacy": {
+      "note": "Primitivas del mundo anterior, a migrar: .page, .card, .btn, .btn-outline, .btn-secondary, .input, .badge, .timer sobre #00153f.",
+      "colors": {
+        "bg": "#00153f",
+        "surface": "#00205b",
+        "muted": "#b7c2dc",
+        "line": "#6b7ba3",
+        "good": "#34d399",
+        "bad": "#ff6b6b"
+      }
+    }
+  },
+  "components": [
+    {
+      "name": "Botón primario",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Acción principal: sticker amarillo con canto que se hunde al apretar. Uno por pantalla.",
+      "html": "<button class=\"ds-btn-primary\">Entrar</button>",
+      "css": ".ds-btn-primary{width:100%;padding:16px;border:0;border-radius:18px;background:var(--color-brand,#f1b514);color:var(--color-brand-contrast,#000);font:900 22px var(--font-sans,Rubik,system-ui,sans-serif);box-shadow:0 7px 0 #b3830a;transition:translate .08s,box-shadow .08s;cursor:pointer}.ds-btn-primary:focus-visible{outline:3px solid var(--color-brand,#f1b514);outline-offset:2px}.ds-btn-primary:active{translate:0 5px;box-shadow:0 2px 0 #b3830a}.ds-btn-primary:disabled{opacity:.5;cursor:not-allowed}"
+    },
+    {
+      "name": "Botón fantasma",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Acción alternativa: sticker blanco con canto azul pálido.",
+      "html": "<button class=\"ds-btn-ghost\">Entrar con otra cuenta</button>",
+      "css": ".ds-btn-ghost{width:100%;padding:16px;border:0;border-radius:18px;background:#fff;color:var(--color-navy,#00205b);font:900 22px var(--font-sans,Rubik,system-ui,sans-serif);box-shadow:0 7px 0 #8fa6d8;transition:translate .08s,box-shadow .08s;cursor:pointer}.ds-btn-ghost:focus-visible{outline:3px solid var(--color-brand,#f1b514);outline-offset:2px}.ds-btn-ghost:active{translate:0 5px;box-shadow:0 2px 0 #8fa6d8}"
+    },
+    {
+      "name": "Campo con etiqueta",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Input blanco con etiqueta ink-soft en mayúsculas; foco con borde y halo amarillos.",
+      "html": "<div class=\"ds-field-bg\"><label class=\"ds-label\">Email<input class=\"ds-input\" type=\"email\" placeholder=\"\"></label></div>",
+      "css": ".ds-field-bg{background:var(--color-navy,#00205b);padding:20px;border-radius:16px}.ds-label{display:flex;flex-direction:column;gap:6px;text-align:left;font:700 13px var(--font-sans,Rubik,system-ui,sans-serif);letter-spacing:.1em;text-transform:uppercase;color:var(--color-ink-soft,#c9d8ff)}.ds-input{width:100%;padding:11px;border:3px solid transparent;border-radius:16px;background:#fff;color:var(--color-navy,#00205b);caret-color:var(--color-field,#1b4fc9);font:500 17px var(--font-sans,Rubik,system-ui,sans-serif);letter-spacing:normal;text-transform:none;transition:border-color .15s,box-shadow .15s}.ds-input:focus{outline:none;border-color:var(--color-brand,#f1b514);box-shadow:0 0 0 4px rgb(241 181 20 / .4)}"
+    },
+    {
+      "name": "Tarjeta-sticker",
+      "kind": "card",
+      "refersTo": "sticker-card",
+      "description": "Tarjeta navy con troquel blanco 10px, radio 36px, giro -1° y canto, sobre el campo azul.",
+      "html": "<div class=\"ds-stage\"><section class=\"ds-card\"><h1 class=\"ds-title\">¡Armá el quiz!</h1><p class=\"ds-lead\">Entrá para crear partidas y llevarlas a la pantalla.</p></section></div>",
+      "css": ".ds-stage{padding:40px 16px;display:grid;place-items:center;background:radial-gradient(circle at 20% 10%,#2d6cf0,transparent 50%),radial-gradient(circle at 90% 90%,#0d3fa8,transparent 50%),var(--color-field,#1b4fc9)}.ds-card{width:min(440px,100%);padding:32px 28px;border:10px solid #fff;border-radius:36px;background:var(--color-navy,#00205b);color:#fff;text-align:center;rotate:-1deg;box-shadow:0 14px 0 rgb(0 20 60 / .45)}.ds-title{margin:0 0 4px;font-family:var(--font-display,\"Bowlby One\",Rubik,sans-serif);font-weight:400;font-size:clamp(44px,6vw,64px);line-height:.95;color:var(--color-brand,#f1b514);text-wrap:balance}.ds-lead{margin:0;font:700 16px/1.5 var(--font-sans,Rubik,system-ui,sans-serif);color:var(--color-ink-soft,#c9d8ff)}"
+    },
+    {
+      "name": "Etiqueta de error",
+      "kind": "custom",
+      "refersTo": "error-tag",
+      "description": "Sticker rojo que cuelga del borde inferior de la tarjeta; entra con slap.",
+      "html": "<div class=\"ds-tag-host\"><p class=\"ds-tag\" role=\"alert\">Email o contraseña incorrectos.</p></div>",
+      "css": ".ds-tag-host{position:relative;height:40px;background:var(--color-navy,#00205b);border-radius:16px;margin-bottom:48px}.ds-tag{position:absolute;left:50%;top:100%;margin:0;width:max-content;max-width:calc(100% - 24px);padding:8px 14px;border:3px solid #fff;border-radius:14px;background:var(--color-alert,#d7263d);color:#fff;font:600 16px var(--font-sans,Rubik,system-ui,sans-serif);translate:-50% -4px;rotate:1.5deg;box-shadow:0 8px 14px -4px rgb(0 10 40 / .5);animation:ds-slap .45s cubic-bezier(.16,1,.3,1)}@keyframes ds-slap{0%{transform:scale(1.35) rotate(6deg);opacity:0}60%{transform:scale(.95);opacity:1}100%{transform:none}}@media (prefers-reduced-motion:reduce){.ds-tag{animation:none}}"
+    },
+    {
+      "name": "Mascota-sticker",
+      "kind": "custom",
+      "refersTo": "mascot-tile",
+      "description": "Ilustración del cliente con troquel blanco 8px, radio 28px, giro propio y canto; se levanta al hover.",
+      "html": "<div class=\"ds-tile\" style=\"--tilt:-8deg\"><div class=\"ds-tile-art\"></div></div>",
+      "css": ".ds-tile{width:200px;overflow:hidden;border:8px solid #fff;border-radius:28px;background:#fff;rotate:var(--tilt,0deg);box-shadow:0 10px 0 rgb(0 20 60 / .35),0 18px 30px rgb(0 0 0 / .25);transition:translate .35s cubic-bezier(.16,1,.3,1),rotate .35s cubic-bezier(.16,1,.3,1)}.ds-tile-art{aspect-ratio:720/393;background:#8ccbec}.ds-tile:hover{translate:0 -8px;rotate:calc(var(--tilt,0deg) + 3deg)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Calcomanía troquelada",
+    "overview": "El quiz es una planilla de calcomanías de New Holland. Un campo azul saturado ocupa toda la pantalla, y todo lo que importa está pegado encima como sticker de vinilo: la tarjeta, los botones, las mascotas, hasta el error. Cada sticker tiene un borde blanco grueso de troquel, esquinas bien redondeadas, un giro leve y un canto sólido debajo, como si fuera un vinilo grueso a punto de despegarse. El usuario eligió este look a partir de una vista previa en HTML y pidió que se reprodujera tal cual.\n\nEs un mundo alegre, con volumen y fácil de tocar, no un panel corporativo. Las mascotas (máquinas New Holland ilustradas con cara, cada una sobre su propio fondo de color plano) dan el humor. El amarillo New Holland se guarda para el título y la acción. Todo texto secundario se tiñe de azul. El rechazo que se confirmó al elegir el mundo es el login genérico: una tarjeta gris centrada sobre fondo oscuro.\n\nLas pantallas vienen de a pocas piezas grandes. La del login tiene una tarjeta, un título, dos campos y un botón. La vida la ponen el movimiento al cargar (los stickers se pegan en secuencia) y la respuesta física al apretar (el botón se hunde sobre su canto).",
+    "keyCharacteristics": [
+      "Campo azul a pantalla completa con dos resplandores radiales suaves; nunca un fondo plano oscuro.",
+      "Cada elemento importante es un sticker: borde blanco, radio amplio, giro leve, canto sólido.",
+      "Amarillo New Holland solo en el título y la acción principal.",
+      "Sin grises: los secundarios son azul pálido (ink-soft) o navy.",
+      "Display gruesa y redonda (Bowlby One) para títulos; Rubik para toda la interfaz.",
+      "Movimiento de \"pegado\": cae agrandado, aprieta, se asienta."
+    ],
+    "rules": [
+      {
+        "name": "The No-Gray Rule",
+        "body": "El texto secundario sobre azul o navy es ink-soft, nunca gris. Hasta el canto del botón blanco está teñido de azul (#8fa6d8).",
+        "section": "colors"
+      },
+      {
+        "name": "The Earned Yellow Rule",
+        "body": "El amarillo NH aparece en el título, en la acción principal y en el foco. Si hay dos cosas amarillas compitiendo en una pantalla, una sobra.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Loud Voice Rule",
+        "body": "Bowlby One se usa para el título y los estados de pantalla completa. Botones, campos y texto van en Rubik; lo que les da fuerza es el peso (900 en botones), no la display.",
+        "section": "typography"
+      },
+      {
+        "name": "The Canto Rule",
+        "body": "El canto es sólido y va siempre hacia abajo. Sobre el campo se tiñe de navy y, en los botones, es un tono más oscuro del mismo relleno. Un botón apretado baja 5px y su canto se achica a 2px: el sticker se hunde, no cambia de color.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Die-Cut Rule",
+        "body": "Si algo importa, tiene borde blanco. Una superficie sin troquel es campo, no sticker.",
+        "section": "shapes"
+      },
+      {
+        "name": "The Gentle Tilt Rule",
+        "body": "Los stickers con texto no pasan de ±1.5°. Los giros más marcados (hasta ±8°) son para las mascotas.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do apoyar cada pantalla nueva sobre el campo azul (field con sus dos resplandores radiales), a pantalla completa.",
+      "Do darle a toda pieza importante su troquel blanco, su radio amplio, un giro leve y un canto sólido hacia abajo.",
+      "Do reservar el amarillo NH para el título y la acción principal (texto negro encima).",
+      "Do usar ink-soft (#c9d8ff) para todo texto secundario sobre azul o navy.",
+      "Do colgar los errores como etiqueta roja por fuera de la tarjeta, sin que el formulario se mueva.",
+      "Do mantener los cuatro colores de opción (opt-0..3) con texto blanco AA para las respuestas del juego.",
+      "Do escribir la interfaz en español rioplatense con voseo (\"Entrá\", \"Pedile\", \"Revisá\").",
+      "Do respetar prefers-reduced-motion: sin \"stick\", sin \"slap\", sin transiciones de sticker."
+    ],
+    "donts": [
+      "Don't armar el login genérico: una tarjeta gris centrada sobre fondo oscuro.",
+      "Don't usar grises para texto secundario ni para cantos; todo se tiñe de azul.",
+      "Don't usar el navy plano #00153f del mundo anterior como fondo de pantallas nuevas.",
+      "Don't girar más de ±1.5° un sticker que lleva texto.",
+      "Don't dibujar ni generar mascotas nuevas; las únicas son las cuatro ilustraciones del cliente en public/mascotas."
+    ]
+  }
+}

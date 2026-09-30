@@ -17,8 +17,16 @@
   --color-opt-1: #2f6fe0;
   --color-opt-2: #b45309;
   --color-opt-3: #15803d;
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: var(--font-rubik), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: var(--font-bowlby), var(--font-rubik), system-ui, sans-serif;
   --radius-card: 14px;
+  /* Mundo calcomanía: campo azul donde se pegan los stickers. */
+  --color-field: #1b4fc9;
+  --color-field-deep: #123a9e;
+  --color-navy: #00205b;
+  /* Secundario sobre azul/navy: teñido de azul, nunca gris. */
+  --color-ink-soft: #c9d8ff;
+  --color-alert: #d7263d;
 }
 
 @layer base {
@@ -35,7 +43,13 @@
 
 /* Primitivas repetidas en todas las pantallas. */
 @layer components {
-  .page { @apply mx-auto flex min-h-dvh max-w-[560px] flex-col gap-4 px-4 py-6; }
+  .page {
+    @apply mx-auto flex min-h-dvh max-w-[560px] flex-col gap-4 px-4;
+    padding-top: max(1.5rem, env(safe-area-inset-top));
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
   .card { @apply flex flex-col gap-3 rounded-card bg-surface p-5; }
   .input { @apply w-full rounded-[10px] border-2 border-line bg-bg p-3.5 text-text focus:border-brand focus:outline-none; }
   .btn { @apply rounded-[10px] bg-brand px-5 py-3.5 text-center font-bold text-brand-contrast; }
@@ -44,4 +58,127 @@
   .btn-secondary { @apply rounded-[10px] border-2 border-muted bg-transparent px-5 py-3.5 text-center font-bold text-text; }
   .badge { @apply rounded-full bg-surface px-3 py-1 font-semibold text-muted; }
   .timer { @apply text-[2.4rem] font-extrabold tabular-nums; }
+
+  /* ── Mundo calcomanía ──────────────────────────────────────────────
+     Todo lo importante es un sticker de vinilo pegado sobre el campo azul:
+     borde blanco grueso, esquinas redondas, leve giro y canto de despegue. */
+  .field {
+    min-height: 100dvh;
+    background:
+      radial-gradient(circle at 20% 10%, #2d6cf0, transparent 50%),
+      radial-gradient(circle at 90% 90%, #0d3fa8, transparent 50%),
+      var(--color-field);
+  }
+  /* Mascota como sticker cuadrado con su fondo de color. */
+  .sticker-tile {
+    position: absolute;
+    overflow: hidden;
+    border: 8px solid #fff;
+    border-radius: 28px;
+    background: #fff;
+    rotate: var(--tilt, 0deg);
+    box-shadow: 0 10px 0 rgb(0 20 60 / 0.35), 0 18px 30px rgb(0 0 0 / 0.25);
+    transition: translate 0.35s cubic-bezier(0.16, 1, 0.3, 1), rotate 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .sticker-tile img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
+  @media (hover: hover) {
+    .sticker-tile:hover { translate: 0 -8px; rotate: calc(var(--tilt, 0deg) + 3deg); }
+  }
+  .sticker-card {
+    position: relative;
+    z-index: 2;
+    width: min(440px, 100%);
+    padding: 32px 28px;
+    border: 10px solid #fff;
+    border-radius: 36px;
+    background: var(--color-navy);
+    color: #fff;
+    text-align: center;
+    rotate: -1deg;
+    box-shadow: 0 14px 0 rgb(0 20 60 / 0.45);
+  }
+  .sticker-title { font-family: var(--font-display); font-size: clamp(44px, 6vw, 64px); line-height: 0.95; color: var(--color-brand); text-wrap: balance; }
+  .sticker-label { @apply flex flex-col gap-1.5 text-left text-[13px] font-bold uppercase tracking-[0.1em]; color: var(--color-ink-soft); }
+  .sticker-input {
+    @apply w-full rounded-2xl border-[3px] border-transparent bg-white p-[11px] text-[17px] font-medium normal-case tracking-normal;
+    color: var(--color-navy);
+    caret-color: var(--color-field);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .sticker-input:focus { outline: none; border-color: var(--color-brand); box-shadow: 0 0 0 4px rgb(241 181 20 / 0.4); }
+  /* Botón con canto: al apretarlo se hunde como un sticker grueso. */
+  .sticker-btn, .sticker-btn-ghost {
+    @apply w-full rounded-[18px] p-4 text-[22px] font-black;
+    transition: translate 0.08s, box-shadow 0.08s;
+  }
+  .sticker-btn { background: var(--color-brand); color: var(--color-brand-contrast); box-shadow: 0 7px 0 #b3830a; }
+  .sticker-btn-ghost { background: #fff; color: var(--color-navy); box-shadow: 0 7px 0 #8fa6d8; }
+  .sticker-btn { @apply inline-flex items-center justify-center text-center; }
+  .sticker-btn-ghost { @apply inline-flex items-center justify-center text-center; }
+  .sticker-btn:not(:disabled):active, .sticker-btn-ghost:not(:disabled):active, .sticker-btn-danger:not(:disabled):active { translate: 0 5px; }
+  .sticker-btn:not(:disabled):active { box-shadow: 0 2px 0 #b3830a; }
+  .sticker-btn-ghost:not(:disabled):active { box-shadow: 0 2px 0 #8fa6d8; }
+  /* Tamaño compacto para acciones dentro de listas y encabezados. */
+  .sticker-btn-sm { @apply w-auto rounded-[14px] px-5 py-2.5 text-[17px]; }
+  .sticker-btn.sticker-btn-sm, .sticker-btn-ghost.sticker-btn-sm { box-shadow: 0 5px 0 var(--canto); }
+  .sticker-btn { --canto: #b3830a; }
+  .sticker-btn-ghost { --canto: #8fa6d8; }
+  .sticker-btn-danger {
+    @apply inline-flex min-h-11 items-center justify-center rounded-[14px] px-4 font-black;
+    background: var(--color-alert);
+    color: #fff;
+    box-shadow: 0 5px 0 #8f1526;
+    transition: translate 0.08s, box-shadow 0.08s;
+  }
+  .sticker-btn-danger:not(:disabled):active { box-shadow: 0 2px 0 #8f1526; }
+  /* Sticker de contenido (filas de lista, avisos): más fino que la tarjeta principal. */
+  .sticker-panel {
+    border: 6px solid #fff;
+    border-radius: 26px;
+    background: var(--color-navy);
+    color: #fff;
+    rotate: var(--tilt, 0deg);
+    box-shadow: 0 10px 0 rgb(0 20 60 / 0.4), 0 16px 26px -8px rgb(0 0 0 / 0.3);
+  }
+  /* Acciones secundarias sobre navy/azul: discretas, sin competir con el amarillo. */
+  .quiet-link { @apply inline-flex min-h-11 items-center px-1 font-semibold underline-offset-4 hover:underline; color: var(--color-ink-soft); }
+  .quiet-link:hover { color: #fff; }
+  /* Error dentro de un sticker: etiqueta roja en el flujo. */
+  .sticker-note { @apply self-start rounded-xl px-3 py-2 font-semibold; background: var(--color-alert); color: #fff; border: 3px solid #fff; rotate: -0.6deg; }
+  /* Error: sticker rojo que se pega colgando del borde inferior de la tarjeta (no mueve el formulario). */
+  .sticker-tag {
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    width: max-content;
+    max-width: calc(100% - 24px);
+    padding: 8px 14px;
+    border: 3px solid #fff;
+    border-radius: 14px;
+    background: var(--color-alert);
+    color: #fff;
+    font-weight: 600;
+    translate: -50% -4px;
+    rotate: 1.5deg;
+    box-shadow: 0 8px 14px -4px rgb(0 10 40 / 0.5);
+    animation: slap 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .stick-in { animation: stick 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--delay, 0ms); }
+}
+
+/* Pegado: el sticker cae un poco agrandado, aprieta y se asienta. */
+@keyframes stick {
+  0% { opacity: 0; transform: translateY(-28px) scale(1.14); }
+  55% { opacity: 1; transform: scale(0.97); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes slap {
+  0% { transform: scale(1.35) rotate(6deg); opacity: 0; }
+  60% { transform: scale(0.95); opacity: 1; }
+  100% { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stick-in, .sticker-tag { animation: none; }
+  .sticker-btn-danger { transition: none; }
+  .sticker-tile, .sticker-btn, .sticker-btn-ghost { transition: none; }
 }

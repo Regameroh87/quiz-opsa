@@ -80,9 +80,9 @@ function LiveGames({ live, onRetry, onFinished }: { live: LiveState; onRetry: ()
   if (live.status === 'loading') return null
   if (live.status === 'error') {
     return (
-      <p className="text-muted" role="status">
+      <p className="text-ink-soft" role="status">
         No pudimos ver si tenés partidas en curso.{' '}
-        <button className="font-semibold text-text underline underline-offset-4"
+        <button className="font-semibold text-white underline underline-offset-4"
           onClick={onRetry}>
           Reintentar
         </button>
@@ -93,7 +93,8 @@ function LiveGames({ live, onRetry, onFinished }: { live: LiveState; onRetry: ()
 
   return (
     <section aria-labelledby="live-heading" className="flex flex-col gap-3">
-      <h2 id="live-heading" className="text-[1.25rem]">
+      <h2 id="live-heading" className="flex items-center gap-2.5 font-display text-2xl text-white">
+        <span aria-hidden className="size-3.5 animate-pulse rounded-full bg-alert ring-4 ring-white" />
         {live.games.length === 1 ? 'Partida en curso' : 'Partidas en curso'}
       </h2>
       <ul className="flex flex-col gap-3">
@@ -101,11 +102,11 @@ function LiveGames({ live, onRetry, onFinished }: { live: LiveState; onRetry: ()
           const titleId = `live-${g.id}`
           const phaseId = `live-phase-${g.id}`
           return (
-            <li key={g.id} className="flex flex-col gap-3 rounded-card border-2 border-brand bg-surface p-5 sm:flex-row sm:items-center sm:gap-6"
+            <li key={g.id} className="sticker-panel flex flex-col gap-3 border-brand p-5 sm:flex-row sm:items-center sm:gap-6"
               aria-busy={finishing === g.id}>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <strong id={titleId} className="text-[1.125rem] break-words">{g.quizzes?.title ?? 'Quiz'}</strong>
-                <span id={phaseId} className="text-muted">{phaseLabel(g)}</span>
+                <strong id={titleId} className="text-[1.2rem] break-words">{g.quizzes?.title ?? 'Quiz'}</strong>
+                <span id={phaseId} className="text-ink-soft">{phaseLabel(g)}</span>
                 {confirming === g.id ? (
                   <div key="confirm" className="flex flex-wrap items-center gap-x-4 gap-y-2"
                     onKeyDown={(e) => e.key === 'Escape' && cancel()}>
@@ -115,15 +116,15 @@ function LiveGames({ live, onRetry, onFinished }: { live: LiveState; onRetry: ()
                   </div>
                 ) : (
                   <div key="actions" className="-ml-1 flex">
-                    <button className={`${QUIET} hover:text-bad`} disabled={!!finishing} aria-describedby={titleId}
+                    <button className={QUIET} disabled={!!finishing} aria-describedby={titleId}
                       autoFocus={cancelled === g.id} onClick={() => { setError(null); setConfirming(g.id) }}>
                       {finishing === g.id ? 'Terminando…' : 'Terminar'}
                     </button>
                   </div>
                 )}
-                {error?.gameId === g.id && <p className="text-bad" role="alert" tabIndex={-1} ref={focusOnMount}>{error.message}</p>}
+                {error?.gameId === g.id && <p className="sticker-note" role="alert" tabIndex={-1} ref={focusOnMount}>{error.message}</p>}
               </div>
-              <Link className="btn shrink-0" href={`/host/${g.id}`} aria-describedby={`${titleId} ${phaseId}`}>Volver a la sala</Link>
+              <Link className="sticker-btn sticker-btn-sm shrink-0" href={`/host/${g.id}`} aria-describedby={`${titleId} ${phaseId}`}>Volver a la sala</Link>
             </li>
           )
         })}
@@ -152,7 +153,7 @@ function AdminHeader({ liveCount }: { liveCount: number }) {
       <header className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="w-full sm:w-auto"><Logo height={36} /></div>
         <div className="flex min-w-0 flex-1 items-center gap-3 sm:justify-end">
-          <span className="min-w-0 truncate text-muted" title={email}>{email}</span>
+          <span className="min-w-0 truncate text-ink-soft" title={email}>{email}</span>
           {/* Salir con una partida abierta corta la pantalla del host: se confirma primero. */}
           <button className={`${QUIET} shrink-0`} key={cancelled ? 'returned' : 'initial'} autoFocus={cancelled}
             aria-expanded={confirming} aria-controls="signout-confirm"
@@ -160,12 +161,12 @@ function AdminHeader({ liveCount }: { liveCount: number }) {
             Cerrar sesión
           </button>
         </div>
-        <Link className="btn-secondary shrink-0 px-4 py-2.5" href="/quiz/new">Nuevo quiz</Link>
+        <Link className="sticker-btn-ghost sticker-btn-sm shrink-0" href="/quiz/new">Nuevo quiz</Link>
       </header>
 
       {/* Aviso de ancho completo debajo del encabezado: no desarma la fila de arriba. */}
       {confirming && (
-        <div id="signout-confirm" role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card border-2 border-bad bg-surface p-4"
+        <div id="signout-confirm" role="alert" className="sticker-panel flex flex-wrap items-center gap-x-4 gap-y-2 border-alert p-4"
           onKeyDown={(e) => e.key === 'Escape' && cancel()}>
           <p className="min-w-0 flex-1 basis-64">
             {liveCount === 1 ? 'Tenés una partida en curso' : 'Tenés partidas en curso'}: si salís, la pantalla de la sala deja de responder.
@@ -200,8 +201,21 @@ const focusOnMount = (el: HTMLElement | null) => el?.focus()
 type Busy = { quizId: string; action: 'launch' | 'remove' } | null
 
 // Acciones secundarias de cada fila: discretas, para que "Lanzar en vivo" sea lo único que resalte.
-const QUIET = 'inline-flex min-h-11 items-center px-1 font-semibold text-muted underline-offset-4 hover:text-text hover:underline'
-const DANGER = 'min-h-11 rounded-[10px] bg-bad px-4 font-bold text-brand-contrast'
+const QUIET = 'quiet-link'
+const DANGER = 'sticker-btn-danger'
+
+// Cada fila es un sticker pegado con su propio giro, alternado para que la grilla respire.
+const TILTS = ['-0.8deg', '0.6deg', '-0.4deg', '0.9deg']
+
+// Pegatina del estado vacío, la misma mascota del login.
+function EmptyMascot() {
+  return (
+    <div aria-hidden className="sticker-tile relative w-40 shrink-0" style={{ '--tilt': '-6deg' } as React.CSSProperties}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- decorativa */}
+      <img src="/mascotas/tractor.webp" width={720} height={393} alt="" draggable={false} />
+    </div>
+  )
+}
 
 export default function QuizList() {
   const [list, setList] = useState<ListState>({ status: 'loading' })
@@ -279,7 +293,8 @@ export default function QuizList() {
   }
 
   return (
-    <main className="page max-w-3xl gap-6">
+    <div className="field">
+    <main className="page max-w-5xl gap-7 pb-16">
       <AdminHeader liveCount={live.status === 'ready' ? live.games.length : 0} />
 
       {/* El título de la página va primero para lectores de pantalla; la franja de partidas se ve antes. */}
@@ -287,47 +302,51 @@ export default function QuizList() {
 
       <LiveGames live={live} onRetry={retryLive} onFinished={() => void fetchLiveGames().then(setLive)} />
 
-      <div className="flex flex-col gap-1">
-        <h2 className="text-[2em]">Quizzes</h2>
+      <div className="flex flex-col gap-2">
+        <h2 className="font-display text-[clamp(2.4rem,5vw,3.4rem)] leading-none text-brand">Tus quizzes</h2>
         {/* La notebook a veces se duplica en el proyector: que nadie se sorprenda al lanzar. */}
-        {listReady && list.status === 'ready' && list.quizzes.length > 0 && <p className="text-muted">Al lanzar, esta pantalla pasa a la sala de espera con el código QR para que se sumen los jugadores.</p>}
+        {listReady && list.status === 'ready' && list.quizzes.length > 0 && <p className="max-w-[60ch] text-ink-soft">Al lanzar, esta pantalla pasa a la sala de espera con el código QR para que se sumen los jugadores.</p>}
       </div>
 
-      {!listReady && <p className="text-muted" role="status">Cargando quizzes…</p>}
+      {!listReady && <p className="font-display text-2xl text-white" role="status">Cargando quizzes…</p>}
 
       {listReady && list.status === 'error' && (
-        <div className="card items-start" role="alert">
-          <p className="text-bad">No pudimos cargar los quizzes. Revisá tu conexión.</p>
-          <button className="btn-secondary" onClick={retry}>Reintentar</button>
+        <div className="sticker-panel flex flex-col items-start gap-4 p-6" role="alert">
+          <p className="sticker-note">No pudimos cargar los quizzes. Revisá tu conexión.</p>
+          <button className="sticker-btn-ghost sticker-btn-sm" onClick={retry}>Reintentar</button>
         </div>
       )}
 
       {listReady && list.status === 'ready' && list.quizzes.length === 0 && (
-        <div className="card items-start">
-          <p>Todavía no hay quizzes.</p>
-          <Link className="btn" href="/quiz/new">Crear el primer quiz</Link>
+        <div className="sticker-panel flex flex-col items-center gap-6 p-8 text-center sm:flex-row sm:text-left">
+          <EmptyMascot />
+          <div className="flex flex-col items-center gap-4 sm:items-start">
+            <p className="font-display text-3xl leading-tight">Todavía no hay quizzes</p>
+            <p className="text-ink-soft">Armá el primero: preguntas, opciones y tiempo, y ya lo podés lanzar en el evento.</p>
+            <Link className="sticker-btn sticker-btn-sm" href="/quiz/new">Crear el primer quiz</Link>
+          </div>
         </div>
       )}
 
       {listReady && list.status === 'ready' && list.quizzes.length > 0 && (
-        <ul className="flex flex-col gap-2">
-          {list.quizzes.map((q) => {
+        <ul className="grid gap-x-6 gap-y-8 md:grid-cols-2">
+          {list.quizzes.map((q, i) => {
             const launching = busy?.quizId === q.id && busy.action === 'launch'
             const removing = busy?.quizId === q.id && busy.action === 'remove'
             const titleId = `quiz-${q.id}`
             const metaId = `quiz-meta-${q.id}`
             const empty = questionCount(q) === 0
             return (
-              <li key={q.id} className="flex flex-col gap-3 rounded-card bg-surface p-5 sm:flex-row sm:items-center sm:gap-6" aria-busy={launching || removing}>
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <strong id={titleId} className="text-[1.125rem] break-words">{q.title}</strong>
+              <li key={q.id} className="sticker-panel flex flex-col gap-4 p-6" style={{ '--tilt': TILTS[i % TILTS.length] } as React.CSSProperties} aria-busy={launching || removing}>
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <strong id={titleId} className="text-[1.35rem] leading-snug break-words">{q.title}</strong>
                   {empty ? (
-                    <p id={metaId} className="text-muted">
+                    <p id={metaId} className="text-ink-soft">
                       Sin preguntas todavía.{' '}
                       <Link className="font-semibold text-brand underline underline-offset-4" href={`/quiz/${q.id}`}>Agregá preguntas</Link>
                     </p>
                   ) : (
-                    <p id={metaId} className="text-muted">{quizMeta(q)}</p>
+                    <p id={metaId} className="text-ink-soft">{quizMeta(q)}</p>
                   )}
                   {confirming === q.id ? (
                     <div key="confirm" className="flex flex-wrap items-center gap-x-4 gap-y-2"
@@ -347,7 +366,7 @@ export default function QuizList() {
                         href={`/quiz/${q.id}`} aria-describedby={titleId} aria-disabled={!!busy} tabIndex={busy ? -1 : undefined}>
                         Editar
                       </Link>
-                      <button className={`${QUIET} hover:text-bad`} disabled={!!busy} aria-describedby={titleId}
+                      <button className={QUIET} disabled={!!busy} aria-describedby={titleId}
                         autoFocus={cancelledRemove === q.id} onClick={() => askRemove(q.id)}>
                         {removing ? 'Borrando…' : 'Borrar'}
                       </button>
@@ -355,20 +374,20 @@ export default function QuizList() {
                   )}
                   {cardError?.quizId === q.id && (
                     // Recibe el foco: el botón que lo disparó queda deshabilitado mientras corre la acción.
-                    <p className="text-bad" role="alert" tabIndex={-1} ref={focusOnMount}>
+                    <p className="sticker-note" role="alert" tabIndex={-1} ref={focusOnMount}>
                       {cardError.message}{' '}
                       {cardError.fixHref && (
-                        <Link className="font-semibold text-text underline underline-offset-4" href={cardError.fixHref}>Editar quiz</Link>
+                        <Link className="font-bold text-white underline underline-offset-4" href={cardError.fixHref}>Editar quiz</Link>
                       )}
                     </p>
                   )}
                 </div>
                 {openGameByQuiz.has(q.id) ? (
-                  <Link className="btn-outline shrink-0" href={`/host/${openGameByQuiz.get(q.id)}`} aria-describedby={titleId}>
+                  <Link className="sticker-btn-ghost sticker-btn-sm self-start" href={`/host/${openGameByQuiz.get(q.id)}`} aria-describedby={titleId}>
                     Volver a la sala
                   </Link>
                 ) : (
-                  <button className="btn-outline shrink-0" disabled={!!busy || empty} aria-describedby={`${titleId} ${metaId}`} onClick={() => launch(q.id)}>
+                  <button className="sticker-btn sticker-btn-sm self-start" disabled={!!busy || empty} aria-describedby={`${titleId} ${metaId}`} onClick={() => launch(q.id)}>
                     {launching ? 'Abriendo sala…' : 'Lanzar en vivo'}
                   </button>
                 )}
@@ -378,5 +397,6 @@ export default function QuizList() {
         </ul>
       )}
     </main>
+    </div>
   )
 }
