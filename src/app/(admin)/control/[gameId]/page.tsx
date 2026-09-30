@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import { errorMessage, rpc, useGame, useHostLive, useQuestion, useRemaining, type Game } from '@/lib/game'
 import { OptionButton } from '@/components/OptionButton'
 import Logo from '@/components/Logo'
+import Avatar from '@/components/Avatar'
 
 // "Revelar ya" no acepta toques en los primeros segundos: un toque de más en "Empezar"/"Siguiente"
 // no puede cerrar la pregunta que se acaba de abrir.
@@ -64,7 +65,11 @@ export default function Control() {
             </div>
             {players.length > 0 && (
               <ul className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
-                {players.map((p) => <li key={p} className="rounded-full bg-white px-3 py-1 text-sm font-bold text-navy">{p}</li>)}
+                {players.map((p) => (
+                  <li key={p.nickname} className="flex items-center gap-1.5 rounded-full bg-white py-0.5 pr-3 pl-0.5 text-sm font-bold text-navy">
+                    <Avatar id={p.avatar} className="size-7" />{p.nickname}
+                  </li>
+                ))}
               </ul>
             )}
           </>
@@ -110,6 +115,7 @@ export default function Control() {
               {board.map((r) => (
                 <li key={r.nickname} className="flex items-center gap-3 rounded-2xl bg-white/10 px-3 py-2">
                   <span className={`flex size-8 flex-none items-center justify-center rounded-full font-display ${r.rank === 1 ? 'bg-brand text-brand-contrast' : 'bg-white text-navy'}`}>{r.rank}</span>
+                  <Avatar id={r.avatar} className="size-9 border-2" />
                   <span className="min-w-0 flex-1 truncate font-bold">{r.nickname}</span>
                   <span className="font-extrabold tabular-nums">{r.score}</span>
                 </li>

@@ -31,6 +31,7 @@ export interface CurrentQuestion {
 
 export interface Standing {
   nickname: string
+  avatar: string
   score: number
   rank: number
   answered: boolean
@@ -38,8 +39,14 @@ export interface Standing {
   last_points: number | null
 }
 
+export interface Player {
+  nickname: string
+  avatar: string
+}
+
 export interface LeaderRow {
   nickname: string
+  avatar: string
   score: number
   rank: number
 }
@@ -48,8 +55,9 @@ const ERRORS: Record<string, string> = {
   game_not_found: 'No encontramos ese código.',
   game_finished: 'Este quiz ya terminó.',
   game_full: 'La sala está llena.',
-  nickname_taken: 'Ese apodo ya está en uso, elegí otro.',
-  invalid_nickname: 'El apodo debe tener entre 1 y 20 caracteres.',
+  nickname_taken: 'Ese nombre ya está en uso, elegí otro.',
+  invalid_nickname: 'El nombre debe tener entre 1 y 20 caracteres.',
+  invalid_avatar: 'Elegí un personaje.',
   too_late: 'Se acabó el tiempo.',
   already_answered: 'Ya respondiste esta pregunta.',
   not_accepting_answers: 'La pregunta ya cerró.',
@@ -160,7 +168,7 @@ export function useHostLive(game: Game | null, questionId: string | undefined) {
   const gameId = game?.id
   const phase = game?.phase
   const pos = game?.current_position
-  const [players, setPlayers] = useState<string[]>([])
+  const [players, setPlayers] = useState<Player[]>([])
   // Respuestas contadas por pregunta, para que el conteo de la anterior no se arrastre a la nueva.
   const [answeredFor, setAnsweredFor] = useState<{ questionId: string; n: number } | null>(null)
   const [stats, setStats] = useState<number[]>([])
@@ -171,11 +179,14 @@ export function useHostLive(game: Game | null, questionId: string | undefined) {
   useEffect(() => {
     if (!gameId) return
     const load = () =>
-      supabase.from('players').select('nickname').eq('game_id', gameId).order('created_at')
-        .then(({ data }) => setPlayers((data ?? []).map((p) => p.nickname)))
+      supabase.from('players').select('nickname, avatar').eq('game_id', gameId).order('created_at')
+        .then(({ data }) => setPlayers(data ?? []))
     const ch = supabase.channel(`players-${gameId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` },
-        (p) => setPlayers((prev) => [...prev, (p.new as { nickname: string }).nickname]))
+        (p) => {
+          const { nickname, avatar } = p.new as Player
+          setPlayers((prev) => [...prev, { nickname, avatar }])
+        })
       .subscribe((s) => s === 'SUBSCRIBED' && load())
     return () => { void supabase.removeChannel(ch) }
   }, [gameId])

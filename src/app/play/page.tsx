@@ -5,13 +5,23 @@ import { useSearchParams } from 'next/navigation'
 import { ensureSession } from '@/lib/supabase'
 import { errorMessage, rpc, useGame, useQuestion, useRemaining, type Standing } from '@/lib/game'
 import { OptionButton, OptionGrid } from '@/components/OptionButton'
+import Avatar, { AVATARS, type AvatarId } from '@/components/Avatar'
 import Logo from '@/components/Logo'
 
-const connecting = <main className="page justify-center text-center"><p className="text-muted">Conectando…</p></main>
+const URGENT_S = 5
+
+/** Estado de espera a pantalla completa, en amarillo sobre el campo. */
+function Status({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="field grid place-items-center px-4">
+      <p className="font-display text-3xl text-brand" role="status">{children}</p>
+    </div>
+  )
+}
 
 // useSearchParams necesita un límite de Suspense para el prerender.
 export default function PlayPage() {
-  return <Suspense fallback={connecting}><Play /></Suspense>
+  return <Suspense fallback={<Status>Conectando…</Status>}><Play /></Suspense>
 }
 
 function Play() {
@@ -19,6 +29,7 @@ function Play() {
   const [code, setCode] = useState((params.get('code') ?? '').toUpperCase())
   const fromQr = (params.get('code') ?? '').length === 6
   const [nickname, setNickname] = useState('')
+  const [avatar, setAvatar] = useState<AvatarId | null>(null)
   const [joined, setJoined] = useState<string | null>(null) // código de la partida ya unida
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
@@ -42,10 +53,11 @@ function Play() {
 
   const join = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!avatar) return setError('Elegí un personaje.')
     setBusy(true)
     setError('')
     try {
-      await rpc('join_game', { p_code: code, p_nickname: nickname })
+      await rpc('join_game', { p_code: code, p_nickname: nickname, p_avatar: avatar })
       setJoined(code.trim().toUpperCase())
     } catch (err) {
       setError(errorMessage(err))
@@ -54,33 +66,61 @@ function Play() {
     }
   }
 
-  if (!ready) return connecting
+  if (!ready) return <Status>Conectando…</Status>
   if (joined) return <PlayGame code={joined} />
 
   return (
-    <main className="page items-center justify-center text-center">
-      <Logo height={44} />
-      <h1>Quiz</h1>
-      <form className="card w-full" onSubmit={join}>
-        {/* Si se llegó por el QR el código ya viene en la URL: solo se pide el apodo. */}
+    <div className="field grid place-items-center px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-16">
+      <form className="sticker-card flex flex-col gap-4 text-left" onSubmit={join}>
+        <div className="flex justify-center"><Logo height={34} /></div>
+        <h1 className="sticker-title text-center">¡Sumate!</h1>
+        {/* Si se llegó por el QR el código ya viene en la URL: no se vuelve a pedir. */}
         {fromQr ? (
-          <p className="text-muted">Partida {code}</p>
+          <p className="-mt-2 text-center font-bold text-ink-soft">Partida <span className="tracking-[.12em] text-white">{code}</span></p>
         ) : (
-          <label>
+          <label className="sticker-label">
             Código de la partida
-            <input className="input" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
-              maxLength={6} autoCapitalize="characters" autoComplete="off" required />
+            <input className="sticker-input text-center font-bold tracking-[.2em] uppercase" value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              maxLength={6} autoCapitalize="characters" autoComplete="off" inputMode="text" required />
           </label>
         )}
-        <label>
-          Tu apodo
-          <input className="input" value={nickname} onChange={(e) => setNickname(e.target.value)}
-            maxLength={20} autoComplete="off" autoFocus={fromQr} required />
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className="sticker-label mb-2">Elegí tu personaje</legend>
+          <div className="grid grid-cols-4 gap-2.5">
+            {AVATARS.map((a, i) => {
+              const selected = avatar === a.id
+              return (
+                <label key={a.id} className="group flex cursor-pointer flex-col items-center gap-1">
+                  <input type="radio" name="avatar" value={a.id} checked={selected} className="peer sr-only"
+                    onChange={() => { setAvatar(a.id); setError('') }} />
+                  <span className={`relative block w-full rounded-full motion-safe:transition-[translate,scale,opacity] motion-safe:duration-200 peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand ${selected ? '-translate-y-1 scale-105' : avatar ? 'opacity-55' : ''}`}
+                    style={{ rotate: `${[-4, 3, -2, 4][i]}deg` }}>
+                    <Avatar id={a.id} className={`w-full border-4 ${selected ? 'shadow-[0_5px_0_rgb(0_20_60/0.5)]' : 'shadow-[0_3px_0_rgb(0_20_60/0.35)]'}`} />
+                    {selected && (
+                      <span aria-hidden className="absolute -right-1 -bottom-1 flex size-6 items-center justify-center rounded-full border-2 border-white bg-field text-xs font-black text-white">✓</span>
+                    )}
+                  </span>
+                  <span className={`text-[11px] font-bold ${selected ? 'text-white' : 'text-ink-soft'}`}>{a.name}</span>
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
+
+        <label className="sticker-label">
+          Tu nombre
+          <input className="sticker-input" value={nickname} onChange={(e) => setNickname(e.target.value)}
+            maxLength={20} autoComplete="off" enterKeyHint="go" required />
         </label>
-        {error && <p className="text-bad" role="alert">{error}</p>}
-        <button className="btn" disabled={busy || code.length < 6 || !nickname.trim()}>Entrar</button>
+        <button className="sticker-btn mt-1" disabled={busy || code.length < 6 || !nickname.trim()}>
+          {busy ? 'Entrando…' : '¡A jugar!'}
+        </button>
+        {/* El error cuelga del borde de la tarjeta: el formulario no salta cuando aparece. */}
+        <div role="alert">{error && <p className="sticker-tag">{error}</p>}</div>
       </form>
-    </main>
+    </div>
   )
 }
 
@@ -115,85 +155,99 @@ function PlayGame({ code }: { code: string }) {
     }
   }
 
-  if (error) return <main className="page justify-center text-center"><p className="text-bad">{errorMessage(error)}</p></main>
-  if (!game) return <main className="page justify-center text-center"><p className="text-muted">Cargando…</p></main>
+  if (error) return <div className="field grid place-items-center px-4"><p className="sticker-note" role="alert">{errorMessage(error)}</p></div>
+  if (!game) return <Status>Cargando…</Status>
 
   const answered = chosen !== null || standing?.answered
+  const seconds = Math.ceil(remaining ?? 0)
 
   return (
-    <main className="page">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="badge min-w-0 flex-1">{standing?.nickname ?? ''}</span>
-        <span className="badge">{standing?.score ?? 0} pts</span>
-      </div>
-
-      {phase === 'lobby' && (
-        <div className="card justify-center text-center">
-          <h2>¡Estás dentro!</h2>
-          <p className="text-muted">Esperando que empiece el quiz…</p>
-        </div>
-      )}
-
-      {phase === 'question' && q && (
-        <>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="badge min-w-0 flex-1">Pregunta {q.data.index + 1} de {q.data.total}</span>
-            <span className="timer" aria-live="off">{Math.ceil(remaining ?? 0)}</span>
+    <div className="field">
+      <main className="page gap-5">
+        {/* Quién soy y cuánto llevo: siempre a la vista. */}
+        <header className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border-[3px] border-white bg-navy py-1 pr-4 pl-1 shadow-[0_4px_0_rgb(0_20_60/0.4)]">
+            <Avatar id={standing?.avatar} className="size-9 border-2" />
+            <span className="truncate font-bold">{standing?.nickname ?? ''}</span>
           </div>
-          <h2>{q.data.text}</h2>
-          {q.data.image_url && (
-            // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
-            <img src={q.data.image_url} alt="" className="mx-auto max-h-[30vh] w-auto rounded-card object-contain" />
-          )}
-          {answered ? (
-            <div className="card text-center" role="status">
-              <h2>¡Respuesta enviada!</h2>
-              <p className="text-muted">Esperá el resultado en la pantalla.</p>
+          <span className="rounded-full border-[3px] border-white bg-white px-4 py-1.5 font-black text-navy tabular-nums shadow-[0_4px_0_#8fa6d8]">
+            {standing?.score ?? 0} pts
+          </span>
+        </header>
+
+        {phase === 'lobby' && (
+          <section className="sticker-card stick-in mx-auto mt-16 flex flex-col items-center gap-3" role="status">
+            <Avatar id={standing?.avatar} className="-mt-20 size-28 border-[6px] shadow-[0_8px_0_rgb(0_20_60/0.4)]" />
+            <h1 className="sticker-title text-[44px]">¡Estás dentro!</h1>
+            <p className="font-bold text-ink-soft">Mirá la pantalla: el quiz arranca en un ratito.</p>
+          </section>
+        )}
+
+        {phase === 'question' && q && (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-bold text-ink-soft">Pregunta {q.data.index + 1} de {q.data.total}</p>
+              <span aria-live="off"
+                className={`flex size-14 flex-none items-center justify-center rounded-full border-4 border-white font-display text-2xl tabular-nums shadow-[0_4px_0_rgb(0_20_60/0.4)] ${remaining !== null && remaining <= URGENT_S ? 'bg-alert text-white' : 'bg-white text-navy'}`}>
+                {seconds}
+              </span>
             </div>
-          ) : (
-            <OptionGrid>
-              {q.data.options.map((o, i) => (
-                <OptionButton key={i} index={i} label={o} onClick={() => answer(i)} disabled={(remaining ?? 0) <= 0} />
-              ))}
-            </OptionGrid>
-          )}
-          {submitError && <p className="text-bad" role="alert">{submitError}</p>}
-        </>
-      )}
+            <h1 key={q.data.id} className="sticker-panel stick-in px-5 py-4 text-xl leading-snug font-extrabold" style={{ '--tilt': '-0.5deg' } as React.CSSProperties}>
+              {q.data.text}
+            </h1>
+            {q.data.image_url && (
+              // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
+              <img src={q.data.image_url} alt="" className="mx-auto max-h-[28vh] w-auto rounded-2xl border-4 border-white object-contain" />
+            )}
+            {answered ? (
+              <section className="sticker-card stick-in mx-auto flex flex-col items-center gap-2" role="status">
+                <p className="sticker-title text-[40px]">¡Enviada!</p>
+                <p className="font-bold text-ink-soft">Esperá el resultado en la pantalla.</p>
+              </section>
+            ) : (
+              <OptionGrid>
+                {q.data.options.map((o, i) => (
+                  <OptionButton key={i} index={i} label={o} onClick={() => answer(i)} disabled={(remaining ?? 0) <= 0} />
+                ))}
+              </OptionGrid>
+            )}
+            {submitError && <p className="sticker-note" role="alert">{submitError}</p>}
+          </>
+        )}
 
-      {(phase === 'reveal' || phase === 'leaderboard') && standing && (
-        <div className="card text-center" role="status">
-          {standing.answered ? (
-            <>
-              <h2 className={standing.last_correct ? 'text-good' : 'text-bad'}>
-                {standing.last_correct ? '¡Correcto!' : 'Incorrecto'}
-              </h2>
-              <p className="text-5xl font-extrabold">+{standing.last_points ?? 0}</p>
-            </>
-          ) : (
-            <h2 className="text-muted">No respondiste a tiempo</h2>
-          )}
-          <p>Vas en el puesto <strong>#{standing.rank}</strong></p>
-        </div>
-      )}
-      {/* Lo mismo que muestra la pantalla al revelar, por si el proyector no se ve bien. */}
-      {phase === 'reveal' && q && (q.data.reveal_image_url || q.data.reveal_text) && (
-        <div className="card">
-          {q.data.reveal_image_url && (
-            // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
-            <img src={q.data.reveal_image_url} alt="" className="mx-auto max-h-[35vh] w-auto rounded-card object-contain" />
-          )}
-          {q.data.reveal_text && <p className="whitespace-pre-line">{q.data.reveal_text}</p>}
-        </div>
-      )}
+        {(phase === 'reveal' || phase === 'leaderboard') && standing && (
+          <section role="status"
+            className={`sticker-card stick-in mx-auto flex flex-col items-center gap-2 ${!standing.answered ? '' : standing.last_correct ? 'bg-opt-3!' : 'bg-alert!'}`}>
+            <p className="font-display text-[40px] leading-none text-white">
+              {!standing.answered ? 'Sin respuesta' : standing.last_correct ? '¡Correcto!' : 'Incorrecto'}
+            </p>
+            {standing.answered
+              ? <p className="font-display text-6xl leading-none text-white">+{standing.last_points ?? 0}</p>
+              : <p className="font-bold text-ink-soft">No respondiste a tiempo.</p>}
+            <p className="mt-2 font-bold">Vas en el puesto <span className="font-display text-2xl">#{standing.rank}</span></p>
+          </section>
+        )}
+        {/* Lo mismo que muestra la pantalla al revelar, por si el proyector no se ve bien. */}
+        {phase === 'reveal' && q && (q.data.reveal_image_url || q.data.reveal_text) && (
+          <section className="sticker-panel flex flex-col gap-3 p-5" style={{ '--tilt': '0.5deg' } as React.CSSProperties}>
+            {q.data.reveal_image_url && (
+              // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
+              <img src={q.data.reveal_image_url} alt="" className="mx-auto max-h-[35vh] w-auto rounded-2xl object-contain" />
+            )}
+            {q.data.reveal_text && <p className="font-semibold whitespace-pre-line">{q.data.reveal_text}</p>}
+          </section>
+        )}
 
-      {phase === 'finished' && standing && (
-        <div className="card text-center">
-          <h2>¡Fin del quiz!</h2>
-          <p className="text-5xl font-extrabold">#{standing.rank}</p>
-          <p>{standing.score} puntos</p>
-        </div>
-      )}
-    </main>
+        {phase === 'finished' && standing && (
+          <section className="sticker-card stick-in mx-auto mt-16 flex flex-col items-center gap-2">
+            <Avatar id={standing.avatar} className="-mt-20 size-28 border-[6px] shadow-[0_8px_0_rgb(0_20_60/0.4)]" />
+            <h1 className="sticker-title text-[44px]">¡Fin del quiz!</h1>
+            <p className="font-bold text-ink-soft">Terminaste en el puesto</p>
+            <p className="font-display text-7xl leading-none text-white">#{standing.rank}</p>
+            <p className="font-bold">{standing.score} puntos</p>
+          </section>
+        )}
+      </main>
+    </div>
   )
 }

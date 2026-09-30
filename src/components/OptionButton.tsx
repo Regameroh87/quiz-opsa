@@ -20,10 +20,10 @@ export function OptionButton({ index, label, onClick, disabled, dim, correct, co
     // En el proyector cada opción es un sticker: troquel blanco y canto.
     large
       ? 'min-h-[4.5em] overflow-hidden rounded-[0.8em] border-[0.2em] border-white px-[0.9em] text-[1.5em] shadow-[0_0.3em_0_rgb(0_20_60/0.45)] motion-safe:transition-[opacity,scale] motion-safe:duration-300'
-      : 'min-h-[72px] rounded-card border-0 text-[1.1rem] min-[481px]:min-h-24',
+      : 'min-h-[72px] overflow-hidden rounded-[20px] border-4 border-white text-[1.1rem] shadow-[0_6px_0_rgb(0_20_60/0.45)] min-[481px]:min-h-24 enabled:active:translate-y-1 enabled:active:shadow-[0_2px_0_rgb(0_20_60/0.45)] motion-safe:transition-[translate,box-shadow,opacity] motion-safe:duration-100',
     BG[index],
     dim && 'opacity-35',
-    correct && (large ? 'scale-[1.03]' : 'outline-5 outline-white'),
+    correct && (large ? 'scale-[1.03]' : 'outline-4 outline-offset-2 outline-white'),
   ].filter(Boolean).join(' ')
   const content = (
     <>

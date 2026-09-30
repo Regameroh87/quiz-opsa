@@ -3,9 +3,10 @@
 import { useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import QRCode from 'qrcode'
-import { errorMessage, rpc, useGame, useHostLive, useLatest, useQuestion, useRemaining, type Game } from '@/lib/game'
+import { errorMessage, rpc, useGame, useHostLive, useLatest, useQuestion, useRemaining, type Game, type Player } from '@/lib/game'
 import { OptionButton, OptionGrid } from '@/components/OptionButton'
 import Logo from '@/components/Logo'
+import Avatar from '@/components/Avatar'
 
 // Pantalla del proyector: todo escala en em a partir del font-size base.
 // Mundo calcomanía: campo azul con las piezas pegadas encima como stickers.
@@ -120,6 +121,7 @@ export default function Host() {
               <li key={r.nickname} className="sticker-panel stick-in flex items-center gap-[0.8em] px-[1em] py-[0.5em]"
                 style={{ '--tilt': i % 2 ? '0.4deg' : '-0.4deg', '--delay': `${i * 90}ms` } as React.CSSProperties}>
                 <span className={`flex size-[1.8em] flex-none items-center justify-center rounded-full font-display ${r.rank === 1 ? 'bg-brand text-brand-contrast' : 'bg-white text-navy'}`}>{r.rank}</span>
+                <Avatar id={r.avatar} className="size-[2.2em] border-[0.12em]" />
                 <span className="flex-1 truncate font-bold">{r.nickname}</span>
                 <span className="font-extrabold tabular-nums">{r.score} <span className="text-[0.7em] font-semibold text-ink-soft">pts</span></span>
               </li>
@@ -136,7 +138,10 @@ export default function Host() {
               <div key={board[i].nickname}
                 className={`stick-in flex w-[14em] flex-col items-center justify-start gap-[0.3em] rounded-t-[1.4em] border-[0.3em] border-b-0 border-white px-[1em] pt-[1em] text-center ${PODIUM[i].height} ${PODIUM[i].fill}`}
                 style={{ '--delay': `${PODIUM[i].delay}ms` } as React.CSSProperties}>
-                <div className="text-[3em] leading-none" aria-hidden>{['🥇', '🥈', '🥉'][i]}</div>
+                <div className="relative">
+                  <Avatar id={board[i].avatar} className={`border-[0.2em] ${i === 0 ? 'size-[6em]' : 'size-[4.5em]'}`} />
+                  <span className="absolute -right-[0.3em] -bottom-[0.2em] text-[2em] leading-none" aria-hidden>{['🥇', '🥈', '🥉'][i]}</span>
+                </div>
                 <span className="sr-only">Puesto {i + 1}:</span>
                 <strong className="w-full truncate font-display text-[1.5em] leading-tight">{board[i].nickname}</strong>
                 <div className="font-bold tabular-nums">{board[i].score} pts</div>
@@ -150,7 +155,7 @@ export default function Host() {
 }
 
 // Los controles viven en el panel admin: el proyector solo muestra cómo sumarse.
-function Lobby({ code, players }: { code: string; players: string[] }) {
+function Lobby({ code, players }: { code: string; players: Player[] }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const url = `${location.origin}/play?code=${code}`
 
@@ -174,9 +179,10 @@ function Lobby({ code, players }: { code: string; players: string[] }) {
         </p>
         <ul className="flex min-h-0 max-w-[60em] flex-wrap justify-center gap-[.6em] overflow-hidden">
           {players.map((p, i) => (
-            <li key={p} className="stick-in rounded-full border-[0.15em] border-white bg-white px-[0.9em] py-[0.3em] font-bold text-navy shadow-[0_0.2em_0_rgb(0_20_60/0.4)]"
+            <li key={p.nickname} className="stick-in flex items-center gap-[0.4em] rounded-full border-[0.15em] border-white bg-white py-[0.15em] pr-[0.9em] pl-[0.15em] font-bold text-navy shadow-[0_0.2em_0_rgb(0_20_60/0.4)]"
               style={{ rotate: `${(i % 5) - 2}deg` }}>
-              {p}
+              <Avatar id={p.avatar} className="size-[1.9em]" />
+              {p.nickname}
             </li>
           ))}
         </ul>
