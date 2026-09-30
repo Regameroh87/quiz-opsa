@@ -1,4 +1,5 @@
 import { adminDb } from '@/lib/admin-api'
+import { OPTION_MAX } from '@/components/OptionButton'
 
 // Arma un borrador de quiz con Gemini (capa gratuita de Google AI Studio). La clave vive solo en el servidor.
 // No guarda nada: devuelve preguntas que el admin revisa en el editor antes de guardar.
@@ -20,7 +21,7 @@ const SCHEMA = {
         type: 'object',
         properties: {
           text: { type: 'string', description: 'La pregunta, máximo 200 caracteres.' },
-          options: { type: 'array', items: { type: 'string' }, minItems: 4, maxItems: 4, description: 'Exactamente 4 opciones cortas (máximo 60 caracteres), una sola correcta.' },
+          options: { type: 'array', items: { type: 'string' }, minItems: 4, maxItems: 4, description: 'Exactamente 4 opciones cortas (idealmente menos de 40 caracteres, nunca más de 80), una sola correcta.' },
           correct_index: { type: 'integer', minimum: 0, maximum: 3 },
           reveal_text: { type: 'string', description: 'Explicación breve de por qué es la correcta, máximo 250 caracteres.' },
         },
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
   const questions = (Array.isArray(out.questions) ? out.questions : [])
     .map((q) => ({
       text: String(q?.text ?? '').trim().slice(0, 300),
-      options: (Array.isArray(q?.options) ? q.options : []).map((o) => String(o).trim()).slice(0, 4),
+      options: (Array.isArray(q?.options) ? q.options : []).map((o) => String(o).trim().slice(0, OPTION_MAX)).slice(0, 4),
       correct_index: Number(q?.correct_index),
       reveal_text: String(q?.reveal_text ?? '').trim().slice(0, 500) || null,
     }))

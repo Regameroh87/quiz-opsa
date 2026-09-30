@@ -188,12 +188,11 @@ export function useLatest<T>(value: T) {
 export function useHostLive(game: Game | null, questionId: string | undefined) {
   const gameId = game?.id
   const phase = game?.phase
-  const pos = game?.current_position
   const [players, setPlayers] = useState<Player[]>([])
   // Respuestas contadas por pregunta, para que el conteo de la anterior no se arrastre a la nueva.
   const [answeredFor, setAnsweredFor] = useState<{ questionId: string; n: number } | null>(null)
   const [stats, setStats] = useState<number[]>([])
-  const [board, setBoard] = useState<LeaderRow[]>([])
+  const board = useLeaderboard(game)
   const currentQuestionId = useLatest(questionId)
 
   // Jugadores en vivo
@@ -242,12 +241,22 @@ export function useHostLive(game: Game | null, questionId: string | undefined) {
     return onVisible(() => void load())
   }, [gameId, phase, questionId])
 
+  const answered = answeredFor && answeredFor.questionId === questionId ? answeredFor.n : 0
+  return { players, answered, stats, board }
+}
+
+/** Ranking de la partida (top 5; top 3 en el podio). Lo leen el anfitrión y los jugadores de esa partida. */
+export function useLeaderboard(game: Game | null) {
+  const gameId = game?.id
+  const phase = game?.phase
+  const pos = game?.current_position
+  const [board, setBoard] = useState<LeaderRow[]>([])
+
   useEffect(() => {
     if (!gameId || (phase !== 'leaderboard' && phase !== 'finished')) return
     rpc<LeaderRow[]>('get_leaderboard', { p_game_id: gameId, p_limit: phase === 'finished' ? 3 : 5 })
       .then(setBoard).catch(() => {})
   }, [gameId, phase, pos])
 
-  const answered = answeredFor && answeredFor.questionId === questionId ? answeredFor.n : 0
-  return { players, answered, stats, board }
+  return board
 }

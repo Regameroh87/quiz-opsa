@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ensureSession, supabase } from '@/lib/supabase'
-import { errorMessage, rpc, useGame, useQuestion, useRemaining, type Standing } from '@/lib/game'
+import { errorMessage, rpc, useGame, useLeaderboard, useQuestion, useRemaining, type Standing } from '@/lib/game'
 import { OptionButton, OptionGrid } from '@/components/OptionButton'
 import Avatar, { AVATARS, type AvatarId } from '@/components/Avatar'
 import Logo from '@/components/Logo'
@@ -136,6 +136,7 @@ function PlayGame({ code }: { code: string }) {
   const { game, error } = useGame({ code })
   const q = useQuestion(game)
   const remaining = useRemaining(q)
+  const board = useLeaderboard(game)
   const [standing, setStanding] = useState<Standing | null>(null)
   // Elección y error por pregunta: al cambiar de posición se descartan solos.
   const [choice, setChoice] = useState<{ pos: number; index: number | null; error: string } | null>(null)
@@ -241,6 +242,26 @@ function PlayGame({ code }: { code: string }) {
               ? <p className="font-display text-6xl leading-none text-white">+{standing.last_points ?? 0}</p>
               : <p className="font-bold text-ink-soft">No respondiste a tiempo.</p>}
             <p className="mt-2 font-bold">Vas en el puesto <span className="font-display text-2xl">#{standing.rank}</span></p>
+          </section>
+        )}
+        {/* El mismo top 5 que muestra el proyector; el jugador se ve resaltado si está entre ellos. */}
+        {phase === 'leaderboard' && board.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <h2 className="font-display text-3xl leading-none text-brand">Ranking</h2>
+            <ol className="flex flex-col gap-2">
+              {board.map((r, i) => {
+                const me = r.nickname === standing?.nickname
+                return (
+                  <li key={r.nickname} className={`sticker-panel stick-in flex items-center gap-3 px-3 py-2 ${me ? 'bg-brand! text-brand-contrast!' : ''}`}
+                    style={{ '--tilt': i % 2 ? '0.4deg' : '-0.4deg', '--delay': `${i * 90}ms` } as React.CSSProperties}>
+                    <span className={`flex size-8 flex-none items-center justify-center rounded-full font-display ${me ? 'bg-white text-navy' : r.rank === 1 ? 'bg-brand text-brand-contrast' : 'bg-white text-navy'}`}>{r.rank}</span>
+                    <Avatar id={r.avatar} className="size-9 border-2" />
+                    <span className="min-w-0 flex-1 truncate font-bold">{r.nickname}{me && <span className="sr-only"> (vos)</span>}</span>
+                    <span className="font-extrabold tabular-nums">{r.score} <span className={`text-xs font-semibold ${me ? '' : 'text-ink-soft'}`}>pts</span></span>
+                  </li>
+                )
+              })}
+            </ol>
           </section>
         )}
         {/* Lo mismo que muestra la pantalla al revelar, por si el proyector no se ve bien. */}

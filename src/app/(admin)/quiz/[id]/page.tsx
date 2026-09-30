@@ -7,7 +7,7 @@ import { authHeader, supabase } from '@/lib/supabase'
 import Logo from '@/components/Logo'
 import { errorMessage } from '@/lib/game'
 import PageTransition from '@/components/PageTransition'
-import { SHAPES } from '@/components/OptionButton'
+import { OPTION_MAX, SHAPES } from '@/components/OptionButton'
 import { deleteQuestionImages, uploadQuestionImage } from '@/lib/image'
 
 interface Q {
@@ -238,7 +238,7 @@ function QuizEditor() {
                       return (
                         <div key={k} className={`flex items-center gap-2 rounded-2xl p-2 ${OPT_BG[k]} ${correct ? 'outline-4 outline-offset-2 outline-brand' : ''}`}>
                           <span className="w-6 flex-none text-center text-xl text-white" aria-hidden>{SHAPES[k]}</span>
-                          <input className="sticker-input min-w-0 flex-1 p-2" placeholder={`Opción ${k + 1}${k < 2 ? '' : ' (opcional)'}`} value={o}
+                          <input className="sticker-input min-w-0 flex-1 p-2" placeholder={`Opción ${k + 1}${k < 2 ? '' : ' (opcional)'}`} value={o} maxLength={OPTION_MAX}
                             aria-label={`Opción ${k + 1}`}
                             onChange={(e) => update(i, { options: q.options.map((x, j) => (j === k ? e.target.value : x)) })} />
                           {/* Radio nativo invisible sobre un círculo: se marca la correcta con un toque. */}

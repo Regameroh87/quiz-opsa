@@ -1,4 +1,8 @@
 export const SHAPES = ['▲', '◆', '●', '■']
+// Largo máximo de una opción (editor e IA): así las cuatro entran en el proyector y en el celular.
+export const OPTION_MAX = 80
+// A partir de este largo, en el proyector la opción usa letra más chica.
+const LONG = 40
 
 // Clases literales para que Tailwind las detecte.
 const BG = ['bg-opt-0', 'bg-opt-1', 'bg-opt-2', 'bg-opt-3']
@@ -28,7 +32,8 @@ export function OptionButton({ index, label, onClick, disabled, dim, correct, co
   const content = (
     <>
       <span className={`flex-none ${large ? 'text-[1.1em]' : 'text-[1.6rem]'}`} aria-hidden>{SHAPES[index]}</span>
-      <span>{label}</span>
+      {/* overflow-wrap: una palabra muy larga corta en vez de desbordar el botón. */}
+      <span className={`min-w-0 leading-tight [overflow-wrap:anywhere] ${large && label.length > LONG ? 'text-[0.8em]' : ''}`}>{label}</span>
       {correct && large && <span className="ml-auto flex size-[1.4em] flex-none items-center justify-center rounded-full bg-white text-navy" aria-label="Correcta">✓</span>}
       {count !== undefined && <span className={`${correct && large ? '' : 'ml-auto'} tabular-nums`}>{count}</span>}
       {count !== undefined && total ? (
