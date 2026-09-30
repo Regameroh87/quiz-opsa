@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import Logo from '@/components/Logo'
+import { SHAPES } from '@/components/OptionButton'
 
 interface Q { id: string; text: string; options: string[]; correct_index: number; time_limit_s: number }
 
@@ -17,6 +19,8 @@ export default function QuizEditor() {
   const [loaded, setLoaded] = useState(id === 'new')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  // Pregunta recién agregada: recibe el foco para escribir sin buscarla.
+  const [addedId, setAddedId] = useState<string | null>(null)
 
   useEffect(() => {
     if (id === 'new') return
@@ -74,44 +78,111 @@ export default function QuizEditor() {
     }
   }
 
-  if (!loaded) return <main className="page justify-center text-center"><p className="text-muted">Cargando…</p></main>
+  if (!loaded) {
+    return (
+      <div className="field grid place-items-center">
+        <p className="font-display text-4xl text-brand" role="status">Cargando…</p>
+      </div>
+    )
+  }
 
   return (
-    <form className="page" onSubmit={save}>
-      <div><Link href="/" className="text-muted">← Volver</Link></div>
-      <input className="input" placeholder="Título del quiz" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} required />
+    <div className="field">
+      <form className="page max-w-3xl gap-8 pb-10" onSubmit={save}>
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <Link href="/" className="quiet-link">← Volver a tus quizzes</Link>
+          <Logo height={32} />
+        </header>
 
-      {questions.map((q, i) => (
-        <fieldset key={q.id} className="card">
-          <legend className="badge">Pregunta {i + 1}</legend>
-          <input className="input" placeholder="Texto de la pregunta" value={q.text} maxLength={300}
-            onChange={(e) => update(i, { text: e.target.value })} />
-          {q.options.map((o, k) => (
-            <label key={k} className="flex items-center gap-2">
-              <input type="radio" name={`correct-${q.id}`} checked={q.correct_index === k}
-                onChange={() => update(i, { correct_index: k })} aria-label={`Opción ${k + 1} es la correcta`} />
-              <input className="input min-w-0 flex-1" placeholder={`Opción ${k + 1}${k < 2 ? '' : ' (opcional)'}`} value={o}
-                onChange={(e) => update(i, { options: q.options.map((x, j) => (j === k ? e.target.value : x)) })} />
-            </label>
+        <section className="sticker-panel flex flex-col gap-4 p-6" style={{ '--tilt': '-0.6deg' } as React.CSSProperties}>
+          <h1 className="font-display text-[clamp(2.2rem,5vw,3.2rem)] leading-none text-brand">{id === 'new' ? 'Nuevo quiz' : 'Editar quiz'}</h1>
+          <label className="sticker-label">
+            Nombre del quiz
+            <input className="sticker-input font-display text-2xl" placeholder="Ej.: Conocé la línea T7" value={title}
+              onChange={(e) => setTitle(e.target.value)} maxLength={120} required />
+          </label>
+        </section>
+
+        <ol className="flex flex-col gap-10">
+          {questions.map((q, i) => (
+            <li key={q.id}>
+              <fieldset className="sticker-panel relative flex min-w-0 flex-col gap-4 p-6 pt-9" style={{ '--tilt': TILTS[i % TILTS.length] } as React.CSSProperties}>
+                {/* Número de pregunta: etiqueta amarilla pegada sobre el borde superior. */}
+                <legend className="absolute -top-5 left-5 rotate-[-3deg] rounded-xl border-[3px] border-white bg-brand px-3 py-1 font-display text-lg text-brand-contrast">
+                  Pregunta {i + 1}
+                </legend>
+                <label className="sticker-label">
+                  Pregunta
+                  <textarea className="sticker-input resize-none" rows={2} placeholder="¿Qué querés preguntar?" value={q.text} maxLength={300}
+                    autoFocus={q.id === addedId} onChange={(e) => update(i, { text: e.target.value })} />
+                </label>
+
+                <div className="flex flex-col gap-2">
+                  <p className="sticker-label">Opciones · marcá la correcta</p>
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    {q.options.map((o, k) => {
+                      const correct = q.correct_index === k
+                      return (
+                        <div key={k} className={`flex items-center gap-2 rounded-2xl p-2 ${OPT_BG[k]} ${correct ? 'outline-4 outline-offset-2 outline-brand' : ''}`}>
+                          <span className="w-6 flex-none text-center text-xl text-white" aria-hidden>{SHAPES[k]}</span>
+                          <input className="sticker-input min-w-0 flex-1 p-2" placeholder={`Opción ${k + 1}${k < 2 ? '' : ' (opcional)'}`} value={o}
+                            aria-label={`Opción ${k + 1}`}
+                            onChange={(e) => update(i, { options: q.options.map((x, j) => (j === k ? e.target.value : x)) })} />
+                          {/* Radio nativo invisible sobre un círculo: se marca la correcta con un toque. */}
+                          <label className="relative grid size-11 flex-none place-items-center">
+                            <input type="radio" name={`correct-${q.id}`} checked={correct} onChange={() => update(i, { correct_index: k })}
+                              aria-label={`Opción ${k + 1} es la correcta`}
+                              className="peer absolute inset-0 cursor-pointer appearance-none rounded-full border-[3px] border-white bg-white/15 checked:bg-white" />
+                            <span className={`pointer-events-none text-xl font-black opacity-0 peer-checked:opacity-100 ${OPT_TEXT[k]}`} aria-hidden>✓</span>
+                          </label>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+                  <label className="sticker-label">
+                    Tiempo
+                    <span className="flex items-center gap-2">
+                      <input className="sticker-input w-24 p-2 text-center" type="number" min={5} max={120} value={q.time_limit_s}
+                        onChange={(e) => update(i, { time_limit_s: Number(e.target.value) })} />
+                      <span className="normal-case tracking-normal">seg</span>
+                    </span>
+                  </label>
+                  <div className="ml-auto flex items-center gap-2">
+                    <button type="button" className={ICON_BTN} onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Subir pregunta ${i + 1}`}>↑</button>
+                    <button type="button" className={ICON_BTN} onClick={() => move(i, 1)} disabled={i === questions.length - 1} aria-label={`Bajar pregunta ${i + 1}`}>↓</button>
+                    <button type="button" className="quiet-link" disabled={questions.length === 1}
+                      onClick={() => setQuestions((qs) => qs.filter((_, j) => j !== i))}>Quitar</button>
+                  </div>
+                </div>
+              </fieldset>
+            </li>
           ))}
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="min-w-0 flex-1">Tiempo (s){' '}
-              <input className="input w-[6em]" type="number" min={5} max={120} value={q.time_limit_s}
-                onChange={(e) => update(i, { time_limit_s: Number(e.target.value) })} />
-            </label>
-            <button type="button" className="btn-secondary" onClick={() => move(i, -1)} aria-label="Subir">↑</button>
-            <button type="button" className="btn-secondary" onClick={() => move(i, 1)} aria-label="Bajar">↓</button>
-            <button type="button" className="btn-secondary" disabled={questions.length === 1}
-              onClick={() => setQuestions((qs) => qs.filter((_, j) => j !== i))}>Quitar</button>
-          </div>
-        </fieldset>
-      ))}
+        </ol>
 
-      {error && <p className="text-bad" role="alert">{error}</p>}
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="btn-secondary" onClick={() => setQuestions((qs) => [...qs, blank()])}>+ Pregunta</button>
-        <button className="btn" disabled={saving}>Guardar</button>
-      </div>
-    </form>
+        <button type="button" className="sticker-btn-ghost sticker-btn-sm self-center"
+          onClick={() => { const q = blank(); setAddedId(q.id); setQuestions((qs) => [...qs, q]) }}>
+          + Agregar pregunta
+        </button>
+
+        {/* Barra fija abajo: "Guardar" siempre a mano aunque el quiz sea largo. */}
+        <div className="sticker-panel sticky bottom-[max(1rem,env(safe-area-inset-bottom))] z-10 flex flex-wrap items-center gap-3 p-3 pl-5">
+          <div className="min-w-0 flex-1 font-semibold text-ink-soft" role="alert">
+            {error
+              ? <p className="sticker-note">{error}</p>
+              : `${questions.length} ${questions.length === 1 ? 'pregunta' : 'preguntas'}`}
+          </div>
+          <button className="sticker-btn sticker-btn-sm" disabled={saving}>{saving ? 'Guardando…' : 'Guardar quiz'}</button>
+        </div>
+      </form>
+    </div>
   )
 }
+
+// Colores y formas de las opciones: los mismos que ven los jugadores.
+const OPT_BG = ['bg-opt-0', 'bg-opt-1', 'bg-opt-2', 'bg-opt-3']
+const OPT_TEXT = ['text-opt-0', 'text-opt-1', 'text-opt-2', 'text-opt-3']
+const TILTS = ['0.5deg', '-0.5deg', '0.3deg', '-0.7deg']
+const ICON_BTN = 'sticker-btn-ghost sticker-btn-sm size-11 p-0'
