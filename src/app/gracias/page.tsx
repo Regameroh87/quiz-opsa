@@ -18,6 +18,13 @@ export default async function Gracias({ searchParams }: { searchParams: Promise<
         <h1 className="sticker-title">¡Gracias por jugar!</h1>
         <p className="font-bold text-ink-soft">Esperamos que la hayas pasado bien. ¡Nos vemos en el próximo evento!</p>
       </section>
+      {/* Pie discreto: el sitio del concesionario, sin competir con la despedida. */}
+      <footer className="absolute inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[3] text-center">
+        <a className="text-sm font-semibold text-ink-soft/80 underline-offset-4 hover:text-white hover:underline"
+          href="https://www.oscarpourtau.com" target="_blank" rel="noopener">
+          www.oscarpourtau.com
+        </a>
+      </footer>
     </Stage>
   )
 }
