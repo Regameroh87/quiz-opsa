@@ -19,7 +19,7 @@ Database: schema lives in `supabase/migrations/` (apply as new numbered migratio
 
 ## Architecture
 
-**All pages are client components talking directly to Supabase** — no API routes, server actions, or server-side Supabase client.
+**All pages are client components talking directly to Supabase** — no server actions. The only API route is `src/app/api/upload/route.ts`: it checks the caller is an admin (Supabase token + `admins` RLS) and returns a presigned PUT URL for Cloudflare R2, where question images live (`questions.image_url`). Images are resized to WebP in the browser (`src/lib/image.ts`) before uploading.
 
 **Security model lives in Postgres, not in the app.** Read `supabase/migrations/0001_init.sql` before changing any game logic:
 - Players sign in anonymously (`ensureSession()` in `src/lib/supabase.ts`); admins use email/password and must have a row in `admins` (`is_admin()`).

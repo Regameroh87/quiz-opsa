@@ -18,6 +18,7 @@ export interface CurrentQuestion {
   index: number
   total: number
   text: string
+  image_url: string | null
   options: string[]
   time_limit_s: number
   question_started_at: string

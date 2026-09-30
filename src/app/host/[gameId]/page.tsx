@@ -128,6 +128,10 @@ export default function Host() {
             )}
           </div>
           <h1>{q.data.text}</h1>
+          {q.data.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
+            <img src={q.data.image_url} alt="" className="mx-auto max-h-[40vh] w-auto rounded-card object-contain" />
+          )}
           <OptionGrid large>
             {q.data.options.map((o, i) => (
               <OptionButton key={i} index={i} label={o}

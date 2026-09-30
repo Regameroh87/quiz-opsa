@@ -6,10 +6,11 @@ import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Logo from '@/components/Logo'
 import { SHAPES } from '@/components/OptionButton'
+import { uploadQuestionImage } from '@/lib/image'
 
-interface Q { id: string; text: string; options: string[]; correct_index: number; time_limit_s: number }
+interface Q { id: string; text: string; image_url: string | null; options: string[]; correct_index: number; time_limit_s: number }
 
-const blank = (): Q => ({ id: crypto.randomUUID(), text: '', options: ['', '', '', ''], correct_index: 0, time_limit_s: 20 })
+const blank = (): Q => ({ id: crypto.randomUUID(), text: '', image_url: null, options: ['', '', '', ''], correct_index: 0, time_limit_s: 20 })
 
 export default function QuizEditor() {
   const { id } = useParams<{ id: string }>()
@@ -21,12 +22,15 @@ export default function QuizEditor() {
   const [saving, setSaving] = useState(false)
   // Pregunta recién agregada: recibe el foco para escribir sin buscarla.
   const [addedId, setAddedId] = useState<string | null>(null)
+  // Preguntas con una imagen subiéndose: mientras haya alguna, no se puede guardar.
+  const [uploading, setUploading] = useState<string[]>([])
+  const [imageError, setImageError] = useState<{ qid: string; message: string } | null>(null)
 
   useEffect(() => {
     if (id === 'new') return
     Promise.all([
       supabase.from('quizzes').select('title').eq('id', id).single(),
-      supabase.from('questions').select('id, text, options, correct_index, time_limit_s').eq('quiz_id', id).order('position'),
+      supabase.from('questions').select('id, text, image_url, options, correct_index, time_limit_s').eq('quiz_id', id).order('position'),
     ]).then(([quiz, qs]) => {
       if (quiz.data) setTitle(quiz.data.title)
       if (qs.data?.length) setQuestions(qs.data as Q[])
@@ -44,6 +48,20 @@ export default function QuizEditor() {
       ;[next[i], next[j]] = [next[j], next[i]]
       return next
     })
+
+  // Se identifica por id (no por índice): la pregunta puede moverse mientras sube.
+  const attachImage = async (qid: string, file: File) => {
+    setImageError(null)
+    setUploading((u) => [...u, qid])
+    try {
+      const url = await uploadQuestionImage(file)
+      setQuestions((qs) => qs.map((q) => (q.id === qid ? { ...q, image_url: url } : q)))
+    } catch {
+      setImageError({ qid, message: 'No se pudo subir la imagen. Probá con otra o intentá de nuevo.' })
+    } finally {
+      setUploading((u) => u.filter((x) => x !== qid))
+    }
+  }
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -117,6 +135,10 @@ export default function QuizEditor() {
                     autoFocus={q.id === addedId} onChange={(e) => update(i, { text: e.target.value })} />
                 </label>
 
+                <QuestionImage url={q.image_url} busy={uploading.includes(q.id)}
+                  error={imageError?.qid === q.id ? imageError.message : ''}
+                  onPick={(file) => void attachImage(q.id, file)} onRemove={() => update(i, { image_url: null })} />
+
                 <div className="flex flex-col gap-2">
                   <p className="sticker-label">Opciones · marcá la correcta</p>
                   <div className="grid gap-2.5 sm:grid-cols-2">
@@ -174,7 +196,9 @@ export default function QuizEditor() {
               ? <p className="sticker-note">{error}</p>
               : `${questions.length} ${questions.length === 1 ? 'pregunta' : 'preguntas'}`}
           </div>
-          <button className="sticker-btn sticker-btn-sm" disabled={saving}>{saving ? 'Guardando…' : 'Guardar quiz'}</button>
+          <button className="sticker-btn sticker-btn-sm" disabled={saving || uploading.length > 0}>
+            {saving ? 'Guardando…' : uploading.length ? 'Subiendo imagen…' : 'Guardar quiz'}
+          </button>
         </div>
       </form>
     </div>
@@ -186,3 +210,34 @@ const OPT_BG = ['bg-opt-0', 'bg-opt-1', 'bg-opt-2', 'bg-opt-3']
 const OPT_TEXT = ['text-opt-0', 'text-opt-1', 'text-opt-2', 'text-opt-3']
 const TILTS = ['0.5deg', '-0.5deg', '0.3deg', '-0.7deg']
 const ICON_BTN = 'sticker-btn-ghost sticker-btn-sm size-11 p-0'
+
+// Imagen opcional de la pregunta: se elige, se optimiza y se sube al momento.
+function QuestionImage({ url, busy, error, onPick, onRemove }: {
+  url: string | null; busy: boolean; error: string; onPick: (file: File) => void; onRemove: () => void
+}) {
+  const input = (
+    <input type="file" accept="image/*" className="sr-only"
+      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onPick(f) }} />
+  )
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="sticker-label">Imagen (opcional)</p>
+      {url ? (
+        <div className="flex flex-wrap items-end gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2 */}
+          <img src={url} alt="" className="max-h-48 rounded-2xl border-4 border-white object-contain" />
+          <div className="flex items-center gap-3">
+            <label className="quiet-link cursor-pointer">{busy ? 'Subiendo…' : 'Cambiar'}{!busy && input}</label>
+            <button type="button" className="quiet-link" onClick={onRemove} disabled={busy}>Quitar imagen</button>
+          </div>
+        </div>
+      ) : (
+        <label className={`flex min-h-24 cursor-pointer items-center justify-center rounded-2xl border-[3px] border-dashed border-ink-soft/60 p-4 text-center font-semibold text-ink-soft hover:border-white hover:text-white ${busy ? 'pointer-events-none opacity-60' : ''}`}>
+          {busy ? 'Optimizando y subiendo…' : '+ Agregar imagen'}
+          {!busy && input}
+        </label>
+      )}
+      {error && <p className="sticker-note" role="alert">{error}</p>}
+    </div>
+  )
+}

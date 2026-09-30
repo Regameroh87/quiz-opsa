@@ -141,6 +141,10 @@ function PlayGame({ code }: { code: string }) {
             <span className="timer" aria-live="off">{Math.ceil(remaining ?? 0)}</span>
           </div>
           <h2>{q.data.text}</h2>
+          {q.data.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
+            <img src={q.data.image_url} alt="" className="mx-auto max-h-[30vh] w-auto rounded-card object-contain" />
+          )}
           {answered ? (
             <div className="card text-center" role="status">
               <h2>¡Respuesta enviada!</h2>
