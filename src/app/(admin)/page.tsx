@@ -125,7 +125,7 @@ function LiveGames({ live, onRetry, onFinished }: { live: LiveState; onRetry: ()
                 )}
                 {error?.gameId === g.id && <p className="sticker-note" role="alert" tabIndex={-1} ref={focusOnMount}>{error.message}</p>}
               </div>
-              <Link className="sticker-btn sticker-btn-sm shrink-0" href={`/host/${g.id}`} aria-describedby={`${titleId} ${phaseId}`}>Volver a la sala</Link>
+              <Link className="sticker-btn sticker-btn-sm shrink-0" href={`/host/${g.id}`} target="_blank" aria-describedby={`${titleId} ${phaseId}`}>Volver a la sala<span className="sr-only"> (se abre en otra pestaña)</span></Link>
             </li>
           )
         })}
@@ -257,14 +257,21 @@ export default function QuizList() {
 
   const launch = async (quizId: string) => {
     if (busy) return
+    // La pestaña se abre ya, dentro del clic: después del await el navegador la bloquearía como pop-up.
+    const tab = window.open('', '_blank')
     setBusy({ quizId, action: 'launch' })
     setConfirming(null)
     setCardError(null)
     try {
       const game = await rpc<Game>('create_game', { p_quiz_id: quizId })
-      // Se mantiene bloqueado hasta que carga la pantalla del host, para no crear otra partida.
-      router.push(`/host/${game.id}`)
+      // El panel queda en esta pestaña; la sala va a la nueva, que es la que se lleva al proyector.
+      if (tab) tab.location.href = `/host/${game.id}`
+      else router.push(`/host/${game.id}`)
+      // Con la partida abierta, el quiz pasa a mostrar "Volver a la sala" en vez de crear otra.
+      await fetchLiveGames().then(setLive)
+      setBusy(null)
     } catch (e) {
+      tab?.close()
       // Otro admin pudo haberle quitado las preguntas desde que se cargó la lista.
       const empty = e instanceof Error && e.message === 'quiz_empty'
       setCardError({ quizId, message: errorMessage(e), fixHref: empty ? `/quiz/${quizId}` : undefined })
@@ -309,7 +316,7 @@ export default function QuizList() {
       <div className="flex flex-col gap-2">
         <h2 className="font-display text-[clamp(2.4rem,5vw,3.4rem)] leading-none text-brand">Tus quizzes</h2>
         {/* La notebook a veces se duplica en el proyector: que nadie se sorprenda al lanzar. */}
-        {listReady && list.status === 'ready' && list.quizzes.length > 0 && <p className="max-w-[60ch] text-ink-soft">Al lanzar, esta pantalla pasa a la sala de espera con el código QR para que se sumen los jugadores.</p>}
+        {listReady && list.status === 'ready' && list.quizzes.length > 0 && <p className="max-w-[60ch] text-ink-soft">Al lanzar, la sala de espera con el código QR se abre en otra pestaña: llevala al proyector y este panel queda acá.</p>}
       </div>
 
       {!listReady && <p className="font-display text-2xl text-white" role="status">Cargando quizzes…</p>}
@@ -387,8 +394,8 @@ export default function QuizList() {
                   )}
                 </div>
                 {openGameByQuiz.has(q.id) ? (
-                  <Link className="sticker-btn-ghost sticker-btn-sm self-start" href={`/host/${openGameByQuiz.get(q.id)}`} aria-describedby={titleId}>
-                    Volver a la sala
+                  <Link className="sticker-btn-ghost sticker-btn-sm self-start" href={`/host/${openGameByQuiz.get(q.id)}`} target="_blank" aria-describedby={titleId}>
+                    Volver a la sala<span className="sr-only"> (se abre en otra pestaña)</span>
                   </Link>
                 ) : (
                   <button className="sticker-btn sticker-btn-sm self-start" disabled={!!busy || empty} aria-describedby={`${titleId} ${metaId}`} onClick={() => launch(q.id)}>

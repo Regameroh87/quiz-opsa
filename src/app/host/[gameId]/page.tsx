@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase'
 import { errorMessage, rpc, useGame, useLatest, useQuestion, useRemaining, type Game, type LeaderRow } from '@/lib/game'
@@ -9,12 +10,21 @@ import { OptionButton, OptionGrid } from '@/components/OptionButton'
 import Logo from '@/components/Logo'
 
 // Pantalla del proyector: todo escala en em a partir del font-size base.
-const SCREEN = 'flex min-h-dvh flex-col gap-[2vw] p-[3vw] text-[clamp(16px,1.6vw,28px)] [&_h1]:text-[3.2em] [&_h1]:leading-[1.1]'
-const BTN = 'px-[1.6em] py-[0.7em] text-[1.1em]'
-const ACTIONS = 'mt-auto flex justify-end gap-[1em]'
+// Mundo calcomanía: campo azul con las piezas pegadas encima como stickers.
+const SCREEN = 'field flex flex-col gap-[1.4em] p-[3vw] text-[clamp(16px,1.6vw,28px)]'
+const TITLE = 'font-display text-[3.4em] leading-[0.95] text-brand [text-wrap:balance]'
+const BTN = 'w-auto! px-[1.6em]! py-[0.6em]! text-[1.1em]!'
+const ACTIONS = 'mt-auto flex items-center justify-end gap-[1em]'
 const REVEAL_LOCK_S = 2
-const PODIUM = ['min-h-[14em] bg-brand', 'min-h-[10em] bg-surface', 'min-h-[7em] bg-surface']
-const CHIP = 'rounded-full bg-surface px-[0.9em] py-[0.4em]'
+const URGENT_S = 5
+// Chip-sticker con troquel blanco para los datos de estado, arriba a la derecha.
+const CHIP = 'rounded-full border-[0.15em] border-white bg-navy px-[0.9em] py-[0.35em] font-bold whitespace-nowrap'
+// Podio: 2.º, 1.º, 3.º de izquierda a derecha; el primero más alto y en amarillo.
+const PODIUM = [
+  { height: 'min-h-[13em]', fill: 'bg-brand text-brand-contrast', delay: 700 },
+  { height: 'min-h-[9.5em]', fill: 'bg-white text-navy', delay: 400 },
+  { height: 'min-h-[7em]', fill: 'bg-white text-navy', delay: 100 },
+]
 
 export default function Host() {
   const { gameId } = useParams<{ gameId: string }>()
@@ -108,54 +118,76 @@ export default function Host() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, pos, remaining, answered])
 
-  if (error) return <div className={SCREEN}><p className="text-bad">{errorMessage(error)}</p></div>
-  if (!game) return <div className={SCREEN}><p className="text-muted">Cargando…</p></div>
+  if (error) return <div className={SCREEN}><p className="sticker-note" role="alert">{errorMessage(error)}</p></div>
+  if (!game) return <div className={`${SCREEN} items-center justify-center`}><p className="font-display text-[2.4em] text-brand" role="status">Cargando…</p></div>
+
+  const image = q && (q.data.reveal_image_url ?? q.data.image_url)
+  const urgent = phase === 'question' && remaining !== null && remaining <= URGENT_S
 
   return (
     <div className={SCREEN}>
-      <Logo height={48} />
+      <header className="flex flex-wrap items-center gap-[1em]">
+        <Logo height={44} />
+        {(phase === 'question' || phase === 'reveal') && q && (
+          <div className="ml-auto flex items-center gap-[0.7em]">
+            <span className={CHIP}>Pregunta {q.data.index + 1} de {q.data.total}</span>
+            {phase === 'question' && (
+              <>
+                <span className={CHIP}><span className="tabular-nums">{answered} / {players.length}</span> respondieron</span>
+                <span role="timer" aria-label={`${Math.ceil(remaining ?? 0)} segundos`}
+                  className={`flex size-[3.2em] items-center justify-center rounded-full border-[0.18em] border-white font-display text-[1.6em] tabular-nums shadow-[0_0.2em_0_rgb(0_20_60/0.45)] ${urgent ? 'bg-alert text-white motion-safe:animate-pulse' : 'bg-white text-navy'}`}>
+                  {Math.ceil(remaining ?? 0)}
+                </span>
+              </>
+            )}
+          </div>
+        )}
+      </header>
+
       {phase === 'lobby' && <Lobby code={game.code} players={players} starting={advancing} onStart={() => advance('start')} />}
 
       {(phase === 'question' || phase === 'reveal') && q && (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="badge min-w-0 flex-1">Pregunta {q.data.index + 1} de {q.data.total}</span>
-            {phase === 'question' && (
-              <>
-                <span className="badge">{answered} / {players.length} respondieron</span>
-                <span className="timer">{Math.ceil(remaining ?? 0)}</span>
-              </>
+          {/* key: cada pregunta nueva se "pega" de nuevo. */}
+          <h1 key={q.data.id} className="sticker-panel stick-in px-[1.2em] py-[0.8em] text-[2.4em] leading-[1.15] font-extrabold [text-wrap:balance]"
+            style={{ '--tilt': '-0.5deg' } as React.CSSProperties}>
+            {q.data.text}
+          </h1>
+          <div className="flex min-h-0 flex-1 items-center gap-[2vw]">
+            {/* Al revelar, la imagen de la respuesta (si hay) reemplaza a la de la pregunta. */}
+            {image && (
+              // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
+              <img src={image} alt="" className="max-h-[38vh] w-auto max-w-[40%] rounded-[1em] border-[0.3em] border-white object-contain shadow-[0_0.35em_0_rgb(0_20_60/0.45)] rotate-[0.8deg]" />
             )}
+            <div className="flex min-w-0 flex-1 flex-col gap-[1.2em]">
+              <OptionGrid large>
+                {q.data.options.map((o, i) => (
+                  <OptionButton key={i} index={i} label={o}
+                    dim={phase === 'reveal' && q.data.correct_index !== i}
+                    correct={phase === 'reveal' && q.data.correct_index === i}
+                    count={phase === 'reveal' ? stats[i] ?? 0 : undefined}
+                    total={phase === 'reveal' ? Math.max(1, stats.reduce((a, b) => a + b, 0)) : undefined} large />
+                ))}
+              </OptionGrid>
+              {phase === 'reveal' && q.data.reveal_text && (
+                <p className="sticker-panel stick-in px-[1.2em] py-[0.8em] text-[1.4em] font-semibold whitespace-pre-line"
+                  style={{ '--tilt': '0.4deg' } as React.CSSProperties}>
+                  {q.data.reveal_text}
+                </p>
+              )}
+            </div>
           </div>
-          <h1>{q.data.text}</h1>
-          {/* Al revelar, la imagen de la respuesta (si hay) reemplaza a la de la pregunta. */}
-          {(q.data.reveal_image_url ?? q.data.image_url) && (
-            // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
-            <img src={(q.data.reveal_image_url ?? q.data.image_url)!} alt="" className="mx-auto max-h-[40vh] w-auto rounded-card object-contain" />
-          )}
-          <OptionGrid large>
-            {q.data.options.map((o, i) => (
-              <OptionButton key={i} index={i} label={o}
-                dim={phase === 'reveal' && q.data.correct_index !== i}
-                correct={phase === 'reveal' && q.data.correct_index === i}
-                count={phase === 'reveal' ? stats[i] ?? 0 : undefined}
-                total={phase === 'reveal' ? Math.max(1, stats.reduce((a, b) => a + b, 0)) : undefined} large />
-            ))}
-          </OptionGrid>
-          {phase === 'reveal' && q.data.reveal_text && (
-            <p className="card whitespace-pre-line text-[1.4em] font-semibold">{q.data.reveal_text}</p>
-          )}
           <div className={ACTIONS}>
             {/* A la izquierda: lejos del lugar donde estaban "Empezar" y "Siguiente pregunta". */}
             {phase === 'question' && (
-              <button className={`btn-secondary mr-auto ${BTN}`} disabled={advancing || justOpened} onClick={() => advance('reveal')}>
+              <button className={`sticker-btn-ghost mr-auto ${BTN}`} disabled={advancing || justOpened} onClick={() => advance('reveal')}>
                 Revelar ya
               </button>
             )}
             {phase === 'reveal' && (
               <>
-                <button className={`btn-secondary ${BTN}`} disabled={advancing} onClick={() => advance('leaderboard')}>Ver ranking</button>
-                <button className={`btn ${BTN}`} disabled={advancing} onClick={() => advance('next')}>
+                <button className={`sticker-btn-ghost ${BTN}`} disabled={advancing} onClick={() => advance('leaderboard')}>Ver ranking</button>
+                <button className={`sticker-btn ${BTN}`} disabled={advancing} onClick={() => advance('next')}>
                   {q.data.index + 1 >= q.data.total ? 'Ver resultado final' : 'Siguiente pregunta'}
                 </button>
               </>
@@ -166,40 +198,47 @@ export default function Host() {
 
       {phase === 'leaderboard' && (
         <>
-          <h1>Ranking</h1>
-          <ol className="flex flex-col gap-2 text-[1.5em]">
-            {board.map((r) => (
-              <li key={r.nickname} className="flex items-center gap-4 rounded-[10px] bg-surface px-4 py-3">
-                <span className="w-[2ch] font-extrabold">{r.rank}</span>
-                <span className="flex-1 truncate">{r.nickname}</span>
-                <span className="font-bold tabular-nums">{r.score}</span>
+          <h1 className={TITLE}>Ranking</h1>
+          <ol className="flex flex-col gap-[0.6em] text-[1.6em]">
+            {board.map((r, i) => (
+              <li key={r.nickname} className="sticker-panel stick-in flex items-center gap-[0.8em] px-[1em] py-[0.5em]"
+                style={{ '--tilt': i % 2 ? '0.4deg' : '-0.4deg', '--delay': `${i * 90}ms` } as React.CSSProperties}>
+                <span className={`flex size-[1.8em] flex-none items-center justify-center rounded-full font-display ${r.rank === 1 ? 'bg-brand text-brand-contrast' : 'bg-white text-navy'}`}>{r.rank}</span>
+                <span className="flex-1 truncate font-bold">{r.nickname}</span>
+                <span className="font-extrabold tabular-nums">{r.score} <span className="text-[0.7em] font-semibold text-ink-soft">pts</span></span>
               </li>
             ))}
           </ol>
-          <div className={ACTIONS}><button className={`btn ${BTN}`} disabled={advancing} onClick={() => advance('next')}>Siguiente</button></div>
+          <div className={ACTIONS}><button className={`sticker-btn ${BTN}`} disabled={advancing} onClick={() => advance('next')}>Siguiente</button></div>
         </>
       )}
 
       {phase === 'finished' && (
         <>
-          <h1 className="text-center">¡Podio final!</h1>
-          <div className="flex items-end justify-center gap-[2vw]">
+          <h1 className={`${TITLE} text-center`}>¡Podio final!</h1>
+          <div className="mt-auto flex items-end justify-center gap-[1.5vw]">
             {[1, 0, 2].map((i) => board[i] && (
-              <div key={board[i].nickname} className={`min-w-[9em] rounded-t-card px-[2em] py-[1em] text-center ${PODIUM[i]}`}>
-                <div className="text-[3em]">{['🥇', '🥈', '🥉'][i]}</div>
-                <strong>{board[i].nickname}</strong>
-                <div>{board[i].score} pts</div>
+              <div key={board[i].nickname}
+                className={`stick-in flex w-[14em] flex-col items-center justify-start gap-[0.3em] rounded-t-[1.4em] border-[0.3em] border-b-0 border-white px-[1em] pt-[1em] text-center ${PODIUM[i].height} ${PODIUM[i].fill}`}
+                style={{ '--delay': `${PODIUM[i].delay}ms` } as React.CSSProperties}>
+                <div className="text-[3em] leading-none" aria-hidden>{['🥇', '🥈', '🥉'][i]}</div>
+                <span className="sr-only">Puesto {i + 1}:</span>
+                <strong className="w-full truncate font-display text-[1.5em] leading-tight">{board[i].nickname}</strong>
+                <div className="font-bold tabular-nums">{board[i].score} pts</div>
               </div>
             ))}
+          </div>
+          <div className="flex justify-center">
+            <Link className="quiet-link" href="/">Volver al panel</Link>
           </div>
         </>
       )}
 
-      {actionError && <p className="text-bad" role="alert">{actionError}</p>}
+      {actionError && <p className="sticker-note" role="alert">{actionError}</p>}
       {/* Recién con la pregunta en pantalla: mientras carga, este lugar es donde estaba "Empezar". */}
       {(phase === 'leaderboard' || ((phase === 'question' || phase === 'reveal') && q)) && (
-        <div className="flex justify-end gap-[1em]">
-          <button className={`btn-secondary ${BTN}`} disabled={advancing} onClick={() => confirm('¿Terminar el quiz ahora?') && advance('finish')}>Terminar</button>
+        <div className="flex justify-end">
+          <button className="quiet-link" disabled={advancing} onClick={() => confirm('¿Terminar el quiz ahora?') && advance('finish')}>Terminar quiz</button>
         </div>
       )}
     </div>
@@ -216,18 +255,29 @@ function Lobby({ code, players, starting, onStart }: { code: string; players: st
 
   return (
     <>
-      <h1>Sumate al quiz</h1>
-      <div className="grid grid-cols-[auto_1fr] items-start gap-[4vw]">
-        <canvas ref={canvas} className="h-[20em]! w-[20em]! rounded-card bg-white p-[1em]" aria-label={`Código QR para unirse: ${url}`} />
-        <div>
-          <p className="text-muted">Escaneá el QR o entrá a {location.host}/play con el código</p>
-          <p className="text-[5em] font-extrabold tracking-[.15em]">{code}</p>
-          <p className="mt-[1em] mb-[.5em]">{players.length} {players.length === 1 ? 'jugador' : 'jugadores'}</p>
-          <div className="flex flex-wrap gap-[.6em]">{players.map((p) => <span key={p} className={CHIP}>{p}</span>)}</div>
+      <h1 className={`${TITLE} text-center`}>¡Sumate al quiz!</h1>
+      {/* El QR va al centro: es lo que la sala busca con el celular. Se achica con la altura para que todo entre en el proyector. */}
+      <div className="flex min-h-0 flex-1 flex-col items-center gap-[1em]">
+        <canvas ref={canvas} className="stick-in h-[min(19em,40vh)]! w-[min(19em,40vh)]! flex-none rounded-[1.4em] bg-white p-[0.8em] shadow-[0_0.4em_0_rgb(0_20_60/0.45)] rotate-[-1.2deg]"
+          aria-label={`Código QR para unirse: ${url}`} />
+        <div className="sticker-panel stick-in px-[1.4em] py-[0.7em] text-center" style={{ '--tilt': '0.8deg', '--delay': '120ms' } as React.CSSProperties}>
+          <p className="font-semibold text-ink-soft">Escaneá el QR o entrá a <strong className="text-white">{location.host}/play</strong> con el código</p>
+          <p className="font-display text-[3.4em] leading-none tracking-[.12em]">{code}</p>
         </div>
+        <p className="text-[1.3em] font-bold" aria-live="polite">
+          {players.length === 0 ? 'Esperando al primer jugador…' : `${players.length} ${players.length === 1 ? 'jugador' : 'jugadores'} en la sala`}
+        </p>
+        <ul className="flex min-h-0 max-w-[60em] flex-wrap justify-center gap-[.6em] overflow-hidden">
+          {players.map((p, i) => (
+            <li key={p} className="stick-in rounded-full border-[0.15em] border-white bg-white px-[0.9em] py-[0.3em] font-bold text-navy shadow-[0_0.2em_0_rgb(0_20_60/0.4)]"
+              style={{ rotate: `${(i % 5) - 2}deg` }}>
+              {p}
+            </li>
+          ))}
+        </ul>
       </div>
       <div className={ACTIONS}>
-        <button className={`btn ${BTN}`} disabled={players.length === 0 || starting} onClick={onStart}>
+        <button className={`sticker-btn ${BTN}`} disabled={players.length === 0 || starting} onClick={onStart}>
           {starting ? 'Empezando…' : 'Empezar'}
         </button>
       </div>

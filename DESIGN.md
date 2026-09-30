@@ -229,7 +229,7 @@ Una de las cuatro ilustraciones del cliente (tractor, cosechadora, pulverizadora
 Los stickers entran en secuencia con "stick": 0.7s en cubic-bezier(0.16, 1, 0.3, 1), cayendo desde -28px a escala 1.14, apretando a 0.97 y asentándose. El escalonado se maneja con `--delay` (100/220/340/460ms en las mascotas). Con prefers-reduced-motion se apagan todas las animaciones y transiciones de sticker.
 
 ### Legacy primitives (a migrar)
-`/`, `/quiz/[id]`, `/host/[gameId]` y `/play` todavía usan las primitivas del mundo anterior: `.page`, `.card` (surface #00205b, 14px), `.btn`, `.btn-outline`, `.btn-secondary`, `.input`, `.badge` y `.timer`, sobre el navy plano #00153f, con muted gris-azulado (#b7c2dc), line (#6b7ba3) y good/bad (#34d399 / #ff6b6b). Son legado, no sistema. Cuando se rediseñe cada pantalla hay que pasarla a este mundo y no copiarlas en superficies nuevas.
+`/play` todavía usa las primitivas del mundo anterior: `.page`, `.card` (surface #00205b, 14px), `.btn`, `.btn-outline`, `.btn-secondary`, `.input`, `.badge` y `.timer`, sobre el navy plano #00153f, con muted gris-azulado (#b7c2dc), line (#6b7ba3) y good/bad (#34d399 / #ff6b6b). Son legado, no sistema. Cuando se rediseñe cada pantalla hay que pasarla a este mundo y no copiarlas en superficies nuevas.
 
 ## Do's and Don'ts
 
