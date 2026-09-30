@@ -95,7 +95,7 @@ function Socios() {
             </label>
             <button className="sticker-btn mt-1.5" disabled={busy}>{busy ? 'Agregando…' : 'Agregar socio'}</button>
             <div role="status">
-              {added && <p className="font-bold text-white"><strong className="break-all">{added}</strong> ya puede entrar al panel. Pasale la contraseña por un canal privado.</p>}
+              {added && <p className="font-bold text-white"><strong className="break-all">{added}</strong> ya puede entrar al panel. Pasale la contraseña por un canal privado; después la puede cambiar desde el panel.</p>}
             </div>
             <div role="alert">{error && <p className="sticker-tag">{error}</p>}</div>
           </form>

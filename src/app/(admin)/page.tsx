@@ -168,6 +168,7 @@ function AdminHeader({ liveCount, quizCount }: { liveCount: number; quizCount: n
           onClick={() => (liveCount > 0 ? setConfirming(true) : signOut())}>
           Cerrar sesión
         </button>
+        <Link className={`${QUIET} shrink-0`} href="/cuenta" transitionTypes={['nav-forward']}>Cambiar contraseña</Link>
         <div className="ml-auto flex shrink-0 items-center gap-3">
           {role === 'admin' && <Link className={QUIET} href="/socios" transitionTypes={['nav-forward']}>Agregar socio</Link>}
           {/* Un usuario común ve solo sus quizzes, así que la cantidad de la lista es la suya. */}
