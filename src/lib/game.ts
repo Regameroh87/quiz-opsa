@@ -73,7 +73,7 @@ const ERRORS: Record<string, string> = {
   quiz_limit: `Llegaste al límite de ${QUIZ_LIMIT} quizzes. Borrá alguno para crear otro.`,
   invalid_transition: 'Ese paso ya no es válido.',
   // /api/generate (quiz armado con IA)
-  ai_busy: 'La IA gratuita llegó a su límite por ahora. Esperá un minuto y probá de nuevo.',
+  ai_busy: 'La IA gratuita está saturada o llegó a su límite. Esperá un minuto y probá de nuevo.',
   ai_failed: 'La IA no pudo armar el quiz. Probá de nuevo o cambiá el tema.',
   ai_not_configured: 'Falta configurar la clave de Gemini (GEMINI_API_KEY).',
 }

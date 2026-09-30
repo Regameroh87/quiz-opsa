@@ -4,7 +4,10 @@ import { adminDb } from '@/lib/admin-api'
 // No guarda nada: devuelve preguntas que el admin revisa en el editor antes de guardar.
 
 const MAX_GENERATED = 20 // igual que en el editor (quiz/[id]/page.tsx)
-const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.8-flash'
+// En la capa gratuita los modelos se saturan seguido (503): si uno falla se prueba el siguiente.
+// Flash-Lite primero: responde en segundos, mientras que 3.8 Flash suele tardar o rechazar pedidos gratis.
+const MODELS = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : ['gemini-3.5-flash-lite', 'gemini-3.8-flash']
+const TIMEOUT_MS = 60_000
 
 // Mismos límites que la tabla `questions` y el editor.
 const SCHEMA = {
@@ -49,20 +52,26 @@ export async function POST(req: Request) {
     'Usá solo datos que sean ciertos y verificables; si el tema es muy específico, mantenete en lo general.',
   ].join('\n')
 
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', responseJsonSchema: SCHEMA },
-    }),
+  const request = JSON.stringify({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { responseMimeType: 'application/json', responseJsonSchema: SCHEMA },
   })
-  // 429: se agotó la cuota gratuita (por minuto o por día).
-  if (res.status === 429) return new Response('ai_busy', { status: 429 })
-  if (!res.ok) {
-    console.error('gemini', res.status, await res.text())
-    return new Response('ai_failed', { status: 502 })
+  let res: Response | null = null
+  let busy = false
+  for (const model of MODELS) {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+      body: request,
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    }).catch(() => null)
+    if (res?.ok) break
+    // 429: cuota gratuita agotada; 503 o sin respuesta: modelo saturado.
+    busy ||= !res || res.status === 429 || res.status === 503
+    console.error('gemini', model, res?.status ?? 'timeout', await res?.text())
+    res = null
   }
+  if (!res) return busy ? new Response('ai_busy', { status: 429 }) : new Response('ai_failed', { status: 502 })
 
   const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
   let out: Generated
