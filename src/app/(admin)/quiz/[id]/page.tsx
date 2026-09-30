@@ -8,7 +8,7 @@ import Logo from '@/components/Logo'
 import { errorMessage } from '@/lib/game'
 import PageTransition from '@/components/PageTransition'
 import { OPTION_MAX, SHAPES } from '@/components/OptionButton'
-import { deleteQuestionImages, uploadQuestionImage } from '@/lib/image'
+import { deleteQuestionImages, imageErrorMessage, uploadQuestionImage } from '@/lib/image'
 
 interface Q {
   id: string; text: string; image_url: string | null; options: string[]; correct_index: number; time_limit_s: number
@@ -83,8 +83,8 @@ function QuizEditor() {
       const previous = questions.find((q) => q.id === qid)?.[field] ?? null
       setQuestions((qs) => qs.map((q) => (q.id === qid ? { ...q, [field]: url } : q)))
       deleteQuestionImages([previous])
-    } catch {
-      setImageError({ key, message: 'No se pudo subir la imagen. Probá con otra o intentá de nuevo.' })
+    } catch (e) {
+      setImageError({ key, message: imageErrorMessage(e) })
     } finally {
       setUploading((u) => u.filter((x) => x !== key))
     }

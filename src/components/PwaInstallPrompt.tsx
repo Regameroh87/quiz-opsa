@@ -1,113 +1,35 @@
 'use client'
 
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
+import { closeIosGuide, installPwa, usePwaInstall } from '@/lib/pwa'
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
-}
-
-function subscribeStandalone(callback: () => void) {
-  if (typeof window === 'undefined') return () => {}
-  const mql = window.matchMedia('(display-mode: standalone)')
-  mql.addEventListener('change', callback)
-  return () => mql.removeEventListener('change', callback)
-}
-
-function getStandaloneSnapshot() {
-  if (typeof window === 'undefined') return false
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    ('standalone' in window.navigator && Boolean((window.navigator as unknown as { standalone: boolean }).standalone))
-  )
-}
-
-function getServerFalse() {
-  return false
-}
-
-function getIosSnapshot() {
-  if (typeof window === 'undefined') return false
-  const ua = window.navigator.userAgent.toLowerCase()
-  return /iphone|ipad|ipod/.test(ua) && !/crios/.test(ua)
-}
-
+// Cerrado en esta sesión: no vuelve a aparecer hasta abrir de nuevo el navegador (sigue en el menú de la cuenta).
 function getSessionDismissedSnapshot() {
-  if (typeof window === 'undefined') return false
-  return sessionStorage.getItem('pwa_prompt_dismissed') === 'true'
+  try {
+    return sessionStorage.getItem('pwa_prompt_dismissed') === 'true'
+  } catch {
+    return false
+  }
 }
 
 export default function PwaInstallPrompt() {
-  const isStandalone = useSyncExternalStore(
-    subscribeStandalone,
-    getStandaloneSnapshot,
-    getServerFalse
-  )
-
-  const isIos = useSyncExternalStore(
-    () => () => {},
-    getIosSnapshot,
-    getServerFalse
-  )
-
-  const isSessionDismissed = useSyncExternalStore(
-    () => () => {},
-    getSessionDismissedSnapshot,
-    getServerFalse
-  )
-
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [showIosGuide, setShowIosGuide] = useState(false)
+  const { canInstall, showIosGuide } = usePwaInstall()
+  const isSessionDismissed = useSyncExternalStore(() => () => {}, getSessionDismissedSnapshot, () => false)
   const [dismissed, setDismissed] = useState(false)
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    // Capturar evento de instalación estándar (Chrome, Android, Edge)
-    const handleBeforeInstall = (e: Event) => {
-      e.preventDefault()
-      setDeferredPrompt(e as BeforeInstallPromptEvent)
-    }
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstall)
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstall)
-    }
-  }, [])
-
-  const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      await deferredPrompt.prompt()
-      const choice = await deferredPrompt.userChoice
-      if (choice.outcome === 'accepted') {
-        setDeferredPrompt(null)
-      }
-    } else if (isIos) {
-      setShowIosGuide(true)
-    }
-  }
 
   const handleDismiss = () => {
     setDismissed(true)
-    setShowIosGuide(false)
-    if (typeof window !== 'undefined') {
+    try {
       sessionStorage.setItem('pwa_prompt_dismissed', 'true')
-    }
+    } catch {}
   }
 
-  if (isStandalone || isSessionDismissed || dismissed) {
-    return null
-  }
-
-  // Si no hay prompt nativo disponible ni es iOS, no mostramos nada
-  if (!deferredPrompt && !isIos) {
-    return null
-  }
+  const showBanner = canInstall && !isSessionDismissed && !dismissed
 
   return (
     <>
       {/* Banner / Píldora de Instalación */}
+      {showBanner && (
       <div className="fixed bottom-3 left-4 right-4 z-40 mx-auto max-w-[500px]">
         <div className="flex items-center justify-between gap-3 rounded-card border-2 border-brand bg-surface p-3.5 shadow-2xl backdrop-blur-md">
           <div className="flex items-center gap-3">
@@ -136,7 +58,7 @@ export default function PwaInstallPrompt() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleInstallClick}
+              onClick={() => void installPwa()}
               className="rounded-[8px] bg-brand px-3.5 py-2 text-xs font-bold text-brand-contrast shadow transition hover:opacity-95 cursor-pointer"
             >
               Instalar
@@ -152,6 +74,7 @@ export default function PwaInstallPrompt() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Modal explicativo para usuarios de iOS / Safari */}
       {showIosGuide && (
@@ -161,7 +84,7 @@ export default function PwaInstallPrompt() {
               <h2 className="text-lg font-bold text-text">Cómo instalar en iPhone / iPad</h2>
               <button
                 type="button"
-                onClick={() => setShowIosGuide(false)}
+                onClick={closeIosGuide}
                 className="text-muted hover:text-text cursor-pointer text-lg font-bold"
               >
                 ✕
@@ -210,7 +133,7 @@ export default function PwaInstallPrompt() {
             <button
               type="button"
               className="btn w-full mt-2"
-              onClick={() => setShowIosGuide(false)}
+              onClick={closeIosGuide}
             >
               Entendido
             </button>

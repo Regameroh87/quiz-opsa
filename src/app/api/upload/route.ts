@@ -5,7 +5,9 @@ import { adminDb } from '@/lib/admin-api'
 // POST firma una subida para que el admin mande la imagen ya optimizada directo al bucket;
 // DELETE borra imágenes que ninguna pregunta usa.
 
-const KEY = /^questions\/[0-9a-f-]{36}\.webp$/
+const KEY = /^questions\/[0-9a-f-]{36}\.(webp|jpg)$/
+// WebP en general; JPEG desde Safari, que no codifica WebP en el navegador.
+const TYPES: Record<string, string> = { 'image/webp': 'webp', 'image/jpeg': 'jpg' }
 
 // Se crea por pedido: sin las variables de R2 el build no debe romperse.
 function bucket() {
@@ -22,11 +24,15 @@ function bucket() {
 
 export async function POST(req: Request) {
   if (!(await adminDb(req))) return new Response('forbidden', { status: 403 })
+  // Sin cuerpo (versión anterior del editor): WebP.
+  const { type = 'image/webp' } = (await req.json().catch(() => ({}))) as { type?: string }
+  if (!Object.hasOwn(TYPES, type)) return new Response('bad_request', { status: 400 })
+  const ext = TYPES[type]
   const { r2, objectUrl } = bucket()
-  const key = `questions/${crypto.randomUUID()}.webp`
+  const key = `questions/${crypto.randomUUID()}.${ext}`
   const url = objectUrl(key)
   url.searchParams.set('X-Amz-Expires', '300')
-  const signed = await r2.sign(new Request(url, { method: 'PUT', headers: { 'content-type': 'image/webp' } }), {
+  const signed = await r2.sign(new Request(url, { method: 'PUT', headers: { 'content-type': type } }), {
     aws: { signQuery: true },
   })
   return Response.json({ uploadUrl: signed.url, publicUrl: `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${key}` })

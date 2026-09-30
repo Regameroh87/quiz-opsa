@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { installPwa, usePwaInstall } from '@/lib/pwa'
 
 const ITEM = 'flex min-h-11 w-full items-center rounded-xl px-3 text-left font-semibold text-white hover:bg-white/10 focus-visible:bg-white/10'
 
-/** Avatar de la cuenta (inicial del mail) con un menú: datos de la sesión, gestión de socios (admin), contraseña y salir. */
+/** Avatar de la cuenta (inicial del mail) con un menú: datos de la sesión, gestión de socios (admin), contraseña, instalar la app y salir. */
 export default function AccountMenu({ email, isAdmin, onSignOut, autoFocus }: {
   email: string
   isAdmin: boolean
@@ -13,6 +14,8 @@ export default function AccountMenu({ email, isAdmin, onSignOut, autoFocus }: {
   autoFocus?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  // Solo si el navegador permite instalarla y todavía no está instalada.
+  const { canInstall } = usePwaInstall()
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
 
@@ -47,6 +50,7 @@ export default function AccountMenu({ email, isAdmin, onSignOut, autoFocus }: {
           <p className="break-all border-b border-white/20 px-3 pb-2 pt-1 text-sm text-ink-soft">{email}</p>
           {isAdmin && <Link className={ITEM} href="/socios" transitionTypes={['nav-forward']} onClick={close}>Socios</Link>}
           <Link className={ITEM} href="/cuenta" transitionTypes={['nav-forward']} onClick={close}>Cambiar contraseña</Link>
+          {canInstall && <button type="button" className={ITEM} onClick={() => { close(); void installPwa() }}>Instalar app</button>}
           <button type="button" className={ITEM} onClick={() => { close(); onSignOut() }}>Cerrar sesión</button>
         </div>
       )}
