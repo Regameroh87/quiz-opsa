@@ -40,6 +40,13 @@ function Control({ gameId }: { gameId: string }) {
   const q = useQuestion(game)
   const remaining = useRemaining(q)
   const { players, answered, stats, board } = useHostLive(game, q?.data.id)
+
+  // Si otro dispositivo lanzó el quiz siguiente, este control pasa solo a esa partida (igual que el proyector).
+  const router = useRouter()
+  const nextGameId = game?.next_game_id
+  useEffect(() => {
+    if (nextGameId) router.replace(`/control/${nextGameId}`)
+  }, [nextGameId, router])
   const [actionError, setActionError] = useState('')
   const [confirmingFinish, setConfirmingFinish] = useState(false)
 

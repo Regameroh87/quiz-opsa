@@ -68,6 +68,13 @@ const ERRORS: Record<string, string> = {
   invalid_transition: 'Ese paso ya no es válido.',
 }
 
+/** Llama a cb cuando la pestaña vuelve a verse: un celular bloqueado o una pestaña dormida pierden avisos de Realtime. */
+function onVisible(cb: () => void) {
+  const handler = () => document.visibilityState === 'visible' && cb()
+  document.addEventListener('visibilitychange', handler)
+  return () => document.removeEventListener('visibilitychange', handler)
+}
+
 export function errorMessage(e: unknown) {
   const msg = e instanceof Error ? e.message : String(e)
   return ERRORS[msg] ?? 'Algo salió mal. Intentá de nuevo.'
@@ -109,8 +116,10 @@ export function useGame(key: { id: string } | { code: string }) {
         // al reconectar se pueden haber perdido eventos
         .subscribe((status) => status === 'SUBSCRIBED' && load())
     })
+    const offVisible = onVisible(() => void load())
     return () => {
       cancelled = true
+      offVisible()
       supabase.removeChannel(channel)
     }
   }, [col, val])
@@ -190,7 +199,11 @@ export function useHostLive(game: Game | null, questionId: string | undefined) {
           setPlayers((prev) => [...prev, { nickname, avatar }])
         })
       .subscribe((s) => s === 'SUBSCRIBED' && load())
-    return () => { void supabase.removeChannel(ch) }
+    const offVisible = onVisible(() => void load())
+    return () => {
+      offVisible()
+      void supabase.removeChannel(ch)
+    }
   }, [gameId])
 
   // Respuestas en vivo: se cuentan inserts y se recarga la distribución al cambiar de fase.
@@ -209,12 +222,14 @@ export function useHostLive(game: Game | null, questionId: string | undefined) {
 
   useEffect(() => {
     if (!gameId || !questionId || (phase !== 'question' && phase !== 'reveal')) return
-    rpc<number[]>('get_answer_stats', { p_game_id: gameId })
+    const load = () => rpc<number[]>('get_answer_stats', { p_game_id: gameId })
       .then((s) => {
         setStats(s)
         if (phase === 'question') setAnsweredFor({ questionId, n: s.reduce((a, b) => a + b, 0) })
       })
       .catch(() => {})
+    void load()
+    return onVisible(() => void load())
   }, [gameId, phase, questionId])
 
   useEffect(() => {

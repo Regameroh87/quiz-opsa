@@ -247,6 +247,35 @@ export default function QuizList() {
     void fetchLiveGames().then(setLive)
   }, [])
 
+  // En vivo: si la partida se maneja desde el celular (o otro admin edita un quiz), este panel se entera
+  // sin recargar. Un refresco fallido no pisa lo que ya se ve: queda el último dato bueno.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const refresh = () => {
+      // Una ráfaga de cambios (p. ej. muchos jugadores sumándose) dispara una sola recarga.
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        void fetchQuizzes().then((s) => s.status === 'ready' && setList(s))
+        void fetchLiveGames().then((s) => s.status === 'ready' && setLive(s))
+      }, 400)
+    }
+    const ch = supabase.channel('admin-panel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, refresh)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quizzes' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, refresh)
+      // Al (re)conectarse se pudieron perder avisos: se recarga.
+      .subscribe((st) => st === 'SUBSCRIBED' && refresh())
+    // Una pestaña en segundo plano puede quedar dormida: al volver a verla, se recarga.
+    const onVisible = () => document.visibilityState === 'visible' && refresh()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      void supabase.removeChannel(ch)
+    }
+  }, [])
+
   // La lista espera a las partidas en curso: así la franja no aparece después y empuja los botones.
   const listReady = list.status !== 'loading' && live.status !== 'loading'
   // Quiz con una partida abierta: su botón vuelve a esa sala en vez de crear otra.
