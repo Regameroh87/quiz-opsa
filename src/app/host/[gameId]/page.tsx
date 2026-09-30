@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useParams } from 'next/navigation'
 import QRCode from 'qrcode'
 import { errorMessage, rpc, useGame, useHostLive, useLatest, useQuestion, useRemaining, type Game, type Player } from '@/lib/game'
@@ -59,6 +59,7 @@ export default function Host() {
 
   return (
     <div className={SCREEN}>
+      <FullscreenButton />
       <header className="flex flex-wrap items-center gap-[1em]">
         <Logo height={44} />
         {(phase === 'question' || phase === 'reveal') && q && (
@@ -188,5 +189,39 @@ function Lobby({ code, players }: { code: string; players: Player[] }) {
         </ul>
       </div>
     </>
+  )
+}
+
+// Pantalla completa: el navegador solo la permite con un clic o una tecla en esta misma pestaña,
+// por eso vive acá y no en el control del celular. La tecla F la alterna; Esc sale.
+const subscribeFullscreen = (cb: () => void) => {
+  document.addEventListener('fullscreenchange', cb)
+  return () => document.removeEventListener('fullscreenchange', cb)
+}
+
+function FullscreenButton() {
+  const isFullscreen = useSyncExternalStore(subscribeFullscreen, () => !!document.fullscreenElement, () => false)
+  const supported = useSyncExternalStore(subscribeFullscreen, () => document.fullscreenEnabled, () => false)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'f' || e.metaKey || e.ctrlKey || e.altKey) return
+      if (document.fullscreenElement) void document.exitFullscreen()
+      else void document.documentElement.requestFullscreen().catch(() => {})
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // En pantalla completa desaparece: la sala no tiene que ver controles.
+  if (!supported || isFullscreen) return null
+  return (
+    <button className="sticker-btn-ghost sticker-btn-sm fixed right-4 bottom-4 z-10 gap-2 text-[15px]! opacity-80 hover:opacity-100 focus-visible:opacity-100"
+      onClick={() => void document.documentElement.requestFullscreen().catch(() => {})}>
+      <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
+      </svg>
+      Pantalla completa <kbd className="rounded-md bg-navy/10 px-1.5 text-[12px]">F</kbd>
+    </button>
   )
 }
