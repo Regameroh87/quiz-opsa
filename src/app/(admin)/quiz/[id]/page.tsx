@@ -7,6 +7,7 @@ import { authHeader, supabase } from '@/lib/supabase'
 import Logo from '@/components/Logo'
 import { errorMessage } from '@/lib/game'
 import PageTransition from '@/components/PageTransition'
+import Spinner from '@/components/Spinner'
 import { OPTION_MAX, SHAPES } from '@/components/OptionButton'
 import { deleteQuestionImages, imageErrorMessage, uploadQuestionImage } from '@/lib/image'
 
@@ -202,7 +203,9 @@ function QuizEditor() {
               </div>
               {ai.error && <p className="sticker-note" role="alert">{ai.error}</p>}
               <div className="flex flex-wrap items-center gap-3">
-                <button form={AI_FORM} className="sticker-btn sticker-btn-sm" disabled={ai.busy}>{ai.busy ? 'Armando preguntas…' : 'Generar'}</button>
+                <button form={AI_FORM} className="sticker-btn sticker-btn-sm gap-2" disabled={ai.busy}>
+                  {ai.busy ? <><Spinner /> Armando preguntas…</> : 'Generar'}
+                </button>
                 <button type="button" className="quiet-link" disabled={ai.busy} onClick={() => setAi((a) => ({ ...a, open: false, error: '' }))}>Cancelar</button>
               </div>
               <p className="text-sm text-ink-soft">Revisá las preguntas antes de guardar: la IA se puede equivocar.</p>
@@ -301,8 +304,8 @@ function QuizEditor() {
               ? <p className="sticker-note">{error}</p>
               : `${questions.length} ${questions.length === 1 ? 'pregunta' : 'preguntas'}`}
           </div>
-          <button className="sticker-btn sticker-btn-sm" disabled={saving || uploading.length > 0}>
-            {saving ? 'Guardando…' : uploading.length ? 'Subiendo imagen…' : 'Guardar quiz'}
+          <button className="sticker-btn sticker-btn-sm gap-2" disabled={saving || uploading.length > 0}>
+            {saving ? <><Spinner /> Guardando…</> : uploading.length ? <><Spinner /> Subiendo imagen…</> : 'Guardar quiz'}
           </button>
         </div>
       </form>
@@ -320,25 +323,41 @@ const ICON_BTN = 'sticker-btn-ghost sticker-btn-sm size-11 p-0'
 function QuestionImage({ label, url, busy, error, onPick, onRemove }: {
   label: string; url: string | null; busy: boolean; error: string; onPick: (file: File) => void; onRemove: () => void
 }) {
+  // Carga de la foto ya subida (viene de R2): esqueleto hasta que llega, aviso si no se puede ver.
+  const [shown, setShown] = useState<{ url: string; failed: boolean } | null>(null)
+  const loaded = shown?.url === url && !shown.failed
+  const failed = shown?.url === url && shown.failed
   const input = (
     <input type="file" accept="image/*" className="sr-only"
       onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onPick(f) }} />
   )
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2" aria-busy={busy}>
       <p className="sticker-label">{label}</p>
       {url ? (
-        <div className="flex flex-wrap items-end gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2 */}
-          <img src={url} alt="" className="max-h-48 rounded-2xl border-4 border-white object-contain" />
-          <div className="flex items-center gap-3">
-            <label className="quiet-link cursor-pointer">{busy ? 'Subiendo…' : 'Cambiar'}{!busy && input}</label>
-            <button type="button" className="quiet-link" onClick={onRemove} disabled={busy}>Quitar imagen</button>
+        // Mismo lugar que el recuadro de "+ Agregar imagen": la foto entera y grande, las acciones debajo.
+        <div className="flex flex-col overflow-hidden rounded-2xl border-[3px] border-ink-soft/40">
+          <div className={`relative grid min-h-48 place-items-center bg-black/25 p-3 ${loaded ? '' : 'motion-safe:animate-pulse'}`}>
+            {!loaded && !failed && <Spinner className="absolute size-8 text-ink-soft" />}
+            {failed && <p className="font-semibold text-ink-soft">No se pudo mostrar la imagen.</p>}
+            {/* eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2 */}
+            <img src={url} alt="" onLoad={() => setShown({ url, failed: false })} onError={() => setShown({ url, failed: true })}
+              className={`max-h-80 w-auto max-w-full rounded-xl object-contain transition-opacity duration-300 ${loaded ? '' : 'opacity-0'} ${failed ? 'hidden' : ''}`} />
+            {/* Cambiando la foto: la actual queda atenuada con el aviso encima. */}
+            {busy && (
+              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-navy/70 font-semibold text-white" role="status">
+                <Spinner /> Subiendo imagen nueva…
+              </div>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-5 border-t-[3px] border-ink-soft/40 px-3">
+            <label className={`quiet-link ${busy ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}>Cambiar imagen{!busy && input}</label>
+            <button type="button" className="quiet-link" onClick={onRemove} disabled={busy}>Quitar</button>
           </div>
         </div>
       ) : (
-        <label className={`flex min-h-24 cursor-pointer items-center justify-center rounded-2xl border-[3px] border-dashed border-ink-soft/60 p-4 text-center font-semibold text-ink-soft hover:border-white hover:text-white ${busy ? 'pointer-events-none opacity-60' : ''}`}>
-          {busy ? 'Optimizando y subiendo…' : '+ Agregar imagen'}
+        <label className={`flex min-h-24 cursor-pointer items-center justify-center gap-2 rounded-2xl border-[3px] border-dashed border-ink-soft/60 p-4 text-center font-semibold text-ink-soft hover:border-white hover:text-white ${busy ? 'pointer-events-none' : ''}`}>
+          {busy ? <span className="flex items-center gap-2 text-white" role="status"><Spinner /> Optimizando y subiendo…</span> : '+ Agregar imagen'}
           {!busy && input}
         </label>
       )}
