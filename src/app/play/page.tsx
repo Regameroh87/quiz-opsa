@@ -264,6 +264,13 @@ function PlayGame({ code }: { code: string }) {
             </ol>
           </section>
         )}
+        {/* Si erró o no respondió, ve cuál era la correcta (con su color y forma), haya explicación o no. */}
+        {phase === 'reveal' && q && q.data.correct_index != null && standing && !standing.last_correct && (
+          <section className="flex flex-col gap-2">
+            <p className="font-bold text-ink-soft">La correcta era</p>
+            <OptionButton index={q.data.correct_index} label={q.data.options[q.data.correct_index]} correct />
+          </section>
+        )}
         {/* Lo mismo que muestra la pantalla al revelar, por si el proyector no se ve bien. */}
         {phase === 'reveal' && q && (q.data.reveal_image_url || q.data.reveal_text) && (
           <section className="sticker-panel flex flex-col gap-3 p-5" style={{ '--tilt': '0.5deg' } as React.CSSProperties}>

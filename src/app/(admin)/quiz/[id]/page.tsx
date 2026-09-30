@@ -238,9 +238,12 @@ function QuizEditor() {
                       return (
                         <div key={k} className={`flex items-center gap-2 rounded-2xl p-2 ${OPT_BG[k]} ${correct ? 'outline-4 outline-offset-2 outline-brand' : ''}`}>
                           <span className="w-6 flex-none text-center text-xl text-white" aria-hidden>{SHAPES[k]}</span>
-                          <input className="sticker-input min-w-0 flex-1 p-2" placeholder={`Opción ${k + 1}${k < 2 ? '' : ' (opcional)'}`} value={o} maxLength={OPTION_MAX}
+                          {/* Crece en alto con el texto (field-sizing): una opción larga se lee entera. Sin saltos de línea. */}
+                          <textarea className="sticker-input min-w-0 flex-1 resize-none p-2 leading-snug field-sizing-content" rows={1}
+                            placeholder={`Opción ${k + 1}${k < 2 ? '' : ' (opcional)'}`} value={o} maxLength={OPTION_MAX}
                             aria-label={`Opción ${k + 1}`}
-                            onChange={(e) => update(i, { options: q.options.map((x, j) => (j === k ? e.target.value : x)) })} />
+                            onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                            onChange={(e) => update(i, { options: q.options.map((x, j) => (j === k ? e.target.value.replace(/\s*\n\s*/g, ' ') : x)) })} />
                           {/* Radio nativo invisible sobre un círculo: se marca la correcta con un toque. */}
                           <label className="relative grid size-11 flex-none place-items-center">
                             <input type="radio" name={`correct-${q.id}`} checked={correct} onChange={() => update(i, { correct_index: k })}

@@ -29,7 +29,9 @@ interface LiveGame {
   players: { count: number }[]
 }
 
-type LiveState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; games: LiveGame[] }
+// podium: partida propia que quedó en el podio (sin cerrar ni encadenar). Su proyector sigue abierto esperando
+// otro quiz, así que el próximo lanzamiento se encadena ahí (create_next_game) en vez de abrir otra pestaña.
+type LiveState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; games: LiveGame[]; podium: string | null }
 
 // Las partidas no se cierran solas: una sala abandonada quedaría "en curso" para siempre.
 // Solo se ofrecen las del mismo día de evento.
@@ -38,14 +40,27 @@ const LIVE_WINDOW_MS = 12 * 60 * 60 * 1000
 async function fetchLiveGames(): Promise<LiveState> {
   const { data: auth } = await supabase.auth.getSession()
   const userId = auth.session?.user.id
-  if (!userId) return { status: 'ready', games: [] }
-  const { data, error } = await supabase.from('games')
-    .select('id, quiz_id, code, phase, current_position, quizzes(title, questions(count)), players(count)')
-    .eq('host_id', userId)
-    .neq('phase', 'finished')
-    .gte('created_at', new Date(Date.now() - LIVE_WINDOW_MS).toISOString())
-    .order('created_at', { ascending: false })
-  return error ? { status: 'error' } : { status: 'ready', games: data as unknown as LiveGame[] }
+  if (!userId) return { status: 'ready', games: [], podium: null }
+  const since = new Date(Date.now() - LIVE_WINDOW_MS).toISOString()
+  const [live, podium] = await Promise.all([
+    supabase.from('games')
+      .select('id, quiz_id, code, phase, current_position, quizzes(title, questions(count)), players(count)')
+      .eq('host_id', userId)
+      .neq('phase', 'finished')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false }),
+    supabase.from('games').select('id')
+      .eq('host_id', userId)
+      .eq('phase', 'finished')
+      .is('closed_at', null)
+      .is('next_game_id', null)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+  if (live.error || podium.error) return { status: 'error' }
+  return { status: 'ready', games: live.data as unknown as LiveGame[], podium: podium.data?.id ?? null }
 }
 
 function phaseLabel(g: LiveGame) {
@@ -286,6 +301,7 @@ function QuizList() {
   const listReady = list.status !== 'loading' && live.status !== 'loading'
   // Quiz con una partida abierta: su botón vuelve a esa sala en vez de crear otra.
   const openGameByQuiz = new Map(live.status === 'ready' ? live.games.map((g) => [g.quiz_id, g.id]) : [])
+  const podium = live.status === 'ready' ? live.podium : null
 
   // Sin volver a 'loading': reintentar no debe esconder la lista de quizzes.
   const retryLive = () => void fetchLiveGames().then(setLive)
@@ -297,13 +313,16 @@ function QuizList() {
 
   const launch = async (quizId: string) => {
     if (busy) return
-    // La pestaña se abre ya, dentro del clic: después del await el navegador la bloquearía como pop-up.
-    const tab = window.open('', '_blank')
+    // Con un proyector esperando en el podio, el quiz se encadena ahí y la pantalla pasa sola a la sala nueva.
+    // Si no, la pestaña se abre ya, dentro del clic: después del await el navegador la bloquearía como pop-up.
+    const tab = podium ? null : window.open('', '_blank')
     setBusy({ quizId, action: 'launch' })
     setConfirming(null)
     setCardError(null)
     try {
-      const game = await rpc<Game>('create_game', { p_quiz_id: quizId })
+      const game = podium
+        ? await rpc<Game>('create_next_game', { p_game_id: podium, p_quiz_id: quizId })
+        : await rpc<Game>('create_game', { p_quiz_id: quizId })
       // La sala va a la pestaña nueva, que es la que se lleva al proyector; esta pasa al control.
       // Si el navegador bloqueó la pestaña, el control ofrece abrir el proyector.
       if (tab) tab.location.href = `/host/${game.id}`
@@ -316,6 +335,8 @@ function QuizList() {
       setCardError({ quizId, message: errorMessage(e), fixHref: empty ? `/quiz/${quizId}` : undefined })
       setBusy(null)
       if (empty) void load()
+      // El podio pudo cerrarse o encadenarse desde el control: se refresca para el próximo intento.
+      if (podium) void fetchLiveGames().then(setLive)
     }
   }
 
@@ -355,7 +376,9 @@ function QuizList() {
       <div className="flex flex-col gap-2">
         <h2 className="font-display text-[clamp(2.4rem,5vw,3.4rem)] leading-none text-brand">Tus quizzes</h2>
         {/* La notebook a veces se duplica en el proyector: que nadie se sorprenda al lanzar. */}
-        {listReady && list.status === 'ready' && list.quizzes.length > 0 && <p className="max-w-[60ch] text-ink-soft">Al lanzar, la sala de espera con el código QR se abre en otra pestaña para el proyector, y esta pasa al control de la partida. El control también se usa desde el celular: entrá al panel y tocá «Controlar».</p>}
+        {listReady && list.status === 'ready' && list.quizzes.length > 0 && <p className="max-w-[60ch] text-ink-soft">{podium
+          ? 'Tu proyector quedó en el podio: al lanzar, el quiz nuevo aparece en esa misma pantalla con su QR, y esta pasa al control. Si cerraste el proyector, abrilo desde el control.'
+          : 'Al lanzar, la sala de espera con el código QR se abre en otra pestaña para el proyector, y esta pasa al control de la partida. El control también se usa desde el celular: entrá al panel y tocá «Controlar».'}</p>}
       </div>
 
       {!listReady && <p className="font-display text-2xl text-white" role="status">Cargando quizzes…</p>}
