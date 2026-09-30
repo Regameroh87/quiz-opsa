@@ -108,9 +108,9 @@ function QuizEditor() {
 
     setSaving(true)
     try {
-      const { data: user } = await supabase.auth.getUser()
       const quizId = id === 'new' ? crypto.randomUUID() : id
-      const { error: qe } = await supabase.from('quizzes').upsert({ id: quizId, title: title.trim(), created_by: user.user?.id })
+      // Sin created_by: el dueño lo pone la base al crear y no cambia al editar (RLS: 0010_roles_quiz_owner.sql).
+      const { error: qe } = await supabase.from('quizzes').upsert({ id: quizId, title: title.trim() })
       if (qe) throw qe
       // Upsert por id (conserva historial de respuestas de preguntas existentes) y borra solo las quitadas.
       const rows = cleaned.map((q, position) => ({ ...q, text: q.text.trim(), quiz_id: quizId, position }))
