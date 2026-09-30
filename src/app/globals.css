@@ -140,6 +140,8 @@
     rotate: var(--tilt, 0deg);
     box-shadow: 0 10px 0 rgb(0 20 60 / 0.4), 0 16px 26px -8px rgb(0 0 0 / 0.3);
   }
+  /* El giro crea un contexto de apilamiento por panel: el que tiene un menú abierto sube sobre los que le siguen. */
+  .sticker-panel:has([aria-expanded='true']) { position: relative; z-index: 30; }
   /* Acciones secundarias sobre navy/azul: discretas, sin competir con el amarillo. */
   .quiet-link { @apply inline-flex min-h-11 items-center px-1 font-semibold underline-offset-4 hover:underline; color: var(--color-ink-soft); }
   .quiet-link:hover { color: #fff; }
