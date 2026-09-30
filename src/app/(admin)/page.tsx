@@ -46,8 +46,7 @@ async function fetchLiveGames(): Promise<LiveState> {
   return error ? { status: 'error' } : { status: 'ready', games: data as unknown as LiveGame[] }
 }
 
-function phaseLabel(g: LiveGame) {
-  const players = g.players[0]?.count ?? 0
+function phaseLabel(g: LiveGame, players: number) {
   const who = `${players} ${players === 1 ? 'jugador' : 'jugadores'}`
   if (g.phase === 'lobby') return `En sala de espera · código ${g.code} · ${who}`
   const total = g.quizzes?.questions[0]?.count
@@ -55,12 +54,37 @@ function phaseLabel(g: LiveGame) {
   return `${g.phase === 'leaderboard' ? `${n} · mostrando ranking` : n} · ${who}`
 }
 
-/** Partidas propias sin terminar: volver a la sala si se cerró la pestaña del host, o cerrar una abandonada. */
-function LiveGames({ live, onRetry, onFinished }: { live: LiveState; onRetry: () => void; onFinished: () => void }) {
+/** Jugadores en vivo de las salas de espera: el panel decide cuándo empezar, así que el conteo no puede quedar viejo. */
+function useLobbyPlayers(ids: string[]) {
+  const [counts, setCounts] = useState<Record<string, number>>({})
+  const key = ids.join(',')
+  useEffect(() => {
+    if (!key) return
+    const list = key.split(',')
+    const load = () => supabase.from('players').select('game_id').in('game_id', list)
+      .then(({ data }) => data && setCounts(Object.fromEntries(list.map((id) => [id, data.filter((p) => p.game_id === id).length]))))
+    const ch = supabase.channel('admin-lobby-players')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `game_id=in.(${key})` },
+        (p) => {
+          const id = (p.new as { game_id: string }).game_id
+          setCounts((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }))
+        })
+      // Se recarga al (re)suscribirse: en una reconexión se pueden perder avisos.
+      .subscribe((st) => st === 'SUBSCRIBED' && load())
+    return () => { void supabase.removeChannel(ch) }
+  }, [key])
+  return counts
+}
+
+/** Partidas propias sin terminar: empezar la que está en sala de espera, volver a la sala si se cerró la pestaña del host, o cerrar una abandonada. */
+function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () => void; onChanged: () => void }) {
   const [confirming, setConfirming] = useState<string | null>(null)
   const [cancelled, setCancelled] = useState<string | null>(null)
   const [finishing, setFinishing] = useState<string | null>(null)
+  const [starting, setStarting] = useState<string | null>(null)
   const [error, setError] = useState<{ gameId: string; message: string } | null>(null)
+  const counts = useLobbyPlayers(live.status === 'ready' ? live.games.filter((g) => g.phase === 'lobby').map((g) => g.id) : [])
+  const playersOf = (g: LiveGame) => counts[g.id] ?? g.players[0]?.count ?? 0
 
   const cancel = () => { setCancelled(confirming); setConfirming(null) }
   const finish = async (gameId: string) => {
@@ -69,11 +93,24 @@ function LiveGames({ live, onRetry, onFinished }: { live: LiveState; onRetry: ()
     setError(null)
     try {
       await rpc<Game>('host_advance', { p_game_id: gameId, p_action: 'finish' })
-      onFinished()
+      onChanged()
     } catch (e) {
       setError({ gameId, message: errorMessage(e) })
     } finally {
       setFinishing(null)
+    }
+  }
+  // La pantalla del proyector escucha los cambios de la partida y pasa sola a la primera pregunta.
+  const start = async (gameId: string) => {
+    setStarting(gameId)
+    setError(null)
+    try {
+      await rpc<Game>('host_advance', { p_game_id: gameId, p_action: 'start' })
+      onChanged()
+    } catch (e) {
+      setError({ gameId, message: errorMessage(e) })
+    } finally {
+      setStarting(null)
     }
   }
 
@@ -107,7 +144,7 @@ function LiveGames({ live, onRetry, onFinished }: { live: LiveState; onRetry: ()
               aria-busy={finishing === g.id}>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <strong id={titleId} className="text-[1.2rem] break-words">{g.quizzes?.title ?? 'Quiz'}</strong>
-                <span id={phaseId} className="text-ink-soft">{phaseLabel(g)}</span>
+                <span id={phaseId} className="text-ink-soft">{phaseLabel(g, playersOf(g))}</span>
                 {confirming === g.id ? (
                   <div key="confirm" className="flex flex-wrap items-center gap-x-4 gap-y-2"
                     onKeyDown={(e) => e.key === 'Escape' && cancel()}>
@@ -125,7 +162,16 @@ function LiveGames({ live, onRetry, onFinished }: { live: LiveState; onRetry: ()
                 )}
                 {error?.gameId === g.id && <p className="sticker-note" role="alert" tabIndex={-1} ref={focusOnMount}>{error.message}</p>}
               </div>
-              <Link className="sticker-btn sticker-btn-sm shrink-0" href={`/host/${g.id}`} target="_blank" aria-describedby={`${titleId} ${phaseId}`}>Volver a la sala<span className="sr-only"> (se abre en otra pestaña)</span></Link>
+              <div className="flex shrink-0 flex-wrap items-center gap-3">
+                {/* En sala de espera la acción principal es empezar; volver a la sala pasa a secundaria. */}
+                <Link className={`${g.phase === 'lobby' ? 'sticker-btn-ghost' : 'sticker-btn'} sticker-btn-sm`} href={`/host/${g.id}`} target="_blank" aria-describedby={`${titleId} ${phaseId}`}>Volver a la sala<span className="sr-only"> (se abre en otra pestaña)</span></Link>
+                {g.phase === 'lobby' && (
+                  <button className="sticker-btn sticker-btn-sm" disabled={playersOf(g) === 0 || !!starting || !!finishing}
+                    aria-describedby={`${titleId} ${phaseId}`} onClick={() => start(g.id)}>
+                    {starting === g.id ? 'Empezando…' : 'Empezar'}
+                  </button>
+                )}
+              </div>
             </li>
           )
         })}
@@ -311,7 +357,7 @@ export default function QuizList() {
       {/* El título de la página va primero para lectores de pantalla; la franja de partidas se ve antes. */}
       <h1 className="sr-only">Panel de quizzes</h1>
 
-      <LiveGames live={live} onRetry={retryLive} onFinished={() => void fetchLiveGames().then(setLive)} />
+      <LiveGames live={live} onRetry={retryLive} onChanged={() => void fetchLiveGames().then(setLive)} />
 
       <div className="flex flex-col gap-2">
         <h2 className="font-display text-[clamp(2.4rem,5vw,3.4rem)] leading-none text-brand">Tus quizzes</h2>

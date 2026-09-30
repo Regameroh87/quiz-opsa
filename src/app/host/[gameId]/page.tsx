@@ -144,7 +144,7 @@ export default function Host() {
         )}
       </header>
 
-      {phase === 'lobby' && <Lobby code={game.code} players={players} starting={advancing} onStart={() => advance('start')} />}
+      {phase === 'lobby' && <Lobby code={game.code} players={players} />}
 
       {(phase === 'question' || phase === 'reveal') && q && (
         <>
@@ -245,7 +245,8 @@ export default function Host() {
   )
 }
 
-function Lobby({ code, players, starting, onStart }: { code: string; players: string[]; starting: boolean; onStart: () => void }) {
+// "Empezar" vive en el panel admin: el proyector solo muestra cómo sumarse.
+function Lobby({ code, players }: { code: string; players: string[] }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const url = `${location.origin}/play?code=${code}`
 
@@ -275,11 +276,6 @@ function Lobby({ code, players, starting, onStart }: { code: string; players: st
             </li>
           ))}
         </ul>
-      </div>
-      <div className={ACTIONS}>
-        <button className={`sticker-btn ${BTN}`} disabled={players.length === 0 || starting} onClick={onStart}>
-          {starting ? 'Empezando…' : 'Empezar'}
-        </button>
       </div>
     </>
   )
