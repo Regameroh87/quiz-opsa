@@ -55,6 +55,9 @@ export interface LeaderRow {
   rank: number
 }
 
+// Tope de quizzes por usuario común; el que manda es el trigger de 0011_quiz_limit.sql (mismo número).
+export const QUIZ_LIMIT = 15
+
 const ERRORS: Record<string, string> = {
   game_not_found: 'No encontramos ese código.',
   game_finished: 'Este quiz ya terminó.',
@@ -67,6 +70,7 @@ const ERRORS: Record<string, string> = {
   not_accepting_answers: 'La pregunta ya cerró.',
   forbidden: 'No tenés permiso para esto.',
   quiz_empty: 'El quiz no tiene preguntas.',
+  quiz_limit: `Llegaste al límite de ${QUIZ_LIMIT} quizzes. Borrá alguno para crear otro.`,
   invalid_transition: 'Ese paso ya no es válido.',
 }
 

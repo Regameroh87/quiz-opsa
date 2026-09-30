@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Logo from '@/components/Logo'
+import { errorMessage } from '@/lib/game'
 import PageTransition from '@/components/PageTransition'
 import { SHAPES } from '@/components/OptionButton'
 import { deleteQuestionImages, uploadQuestionImage } from '@/lib/image'
@@ -123,8 +124,10 @@ function QuizEditor() {
       const kept = new Set(rows.flatMap((r) => [r.image_url, r.reveal_image_url]))
       deleteQuestionImages(savedImages.current.filter((u) => !kept.has(u)))
       router.push('/', { transitionTypes: ['nav-back'] })
-    } catch {
-      setError('No se pudo guardar. Intentá de nuevo.')
+    } catch (e) {
+      // Los errores de PostgREST no son Error: el código de la base viene en .message.
+      const code = (e as { message?: string } | null)?.message
+      setError(code === 'quiz_limit' ? errorMessage(new Error(code)) : 'No se pudo guardar. Intentá de nuevo.')
       setSaving(false)
     }
   }

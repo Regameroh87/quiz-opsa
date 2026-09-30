@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { errorMessage, rpc, type Game, type Phase } from '@/lib/game'
+import { errorMessage, QUIZ_LIMIT, rpc, type Game, type Phase } from '@/lib/game'
 import Logo from '@/components/Logo'
 import PageTransition from '@/components/PageTransition'
 import { deleteQuestionImages } from '@/lib/image'
@@ -141,16 +141,16 @@ function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () 
 }
 
 /** Encabezado: marca, quién está logueado en la notebook compartida, cómo salir y "Nuevo quiz". */
-function AdminHeader({ liveCount }: { liveCount: number }) {
+function AdminHeader({ liveCount, quizCount }: { liveCount: number; quizCount: number }) {
   const [email, setEmail] = useState('')
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [role, setRole] = useState<'admin' | 'user' | null>(null)
   const [confirming, setConfirming] = useState(false)
   // Al cancelar, el foco vuelve a "Cerrar sesión" en vez de perderse en <body>.
   const [cancelled, setCancelled] = useState(false)
   const cancel = () => { setConfirming(false); setCancelled(true) }
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => setEmail(data.session?.user.email ?? ''))
-    void supabase.from('admins').select('role').maybeSingle().then(({ data }) => setIsAdmin(data?.role === 'admin'))
+    void supabase.from('admins').select('role').maybeSingle().then(({ data }) => setRole(data?.role ?? null))
   }, [])
 
   // Scope local: cierra solo esta notebook, no las sesiones del admin en otros equipos.
@@ -158,21 +158,22 @@ function AdminHeader({ liveCount }: { liveCount: number }) {
 
   return (
     <>
-      {/* El orden del DOM es el visual: logo, cuenta, "Nuevo quiz". En el celular el logo ocupa su propia línea. */}
+      {/* El orden del DOM es el visual. En el celular cada bloque tiene su línea: logo, mail completo, y abajo los botones. */}
       <header className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="w-full sm:w-auto"><Logo height={36} /></div>
-        <div className="flex min-w-0 flex-1 items-center gap-3 sm:justify-end">
-          <span className="min-w-0 truncate text-ink-soft" title={email}>{email}</span>
-          {/* Salir con una partida abierta corta la pantalla del host: se confirma primero. */}
-          <button className={`${QUIET} shrink-0`} key={cancelled ? 'returned' : 'initial'} autoFocus={cancelled}
-            aria-expanded={confirming} aria-controls="signout-confirm"
-            onClick={() => (liveCount > 0 ? setConfirming(true) : signOut())}>
-            Cerrar sesión
-          </button>
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          {isAdmin && <Link className={QUIET} href="/socios" transitionTypes={['nav-forward']}>Agregar socio</Link>}
-          <Link className="sticker-btn-ghost sticker-btn-sm" href="/quiz/new" transitionTypes={['nav-forward']}>Nuevo quiz</Link>
+        <span className="w-full min-w-0 break-all text-ink-soft sm:w-auto sm:flex-1 sm:truncate sm:text-right" title={email}>{email}</span>
+        {/* Salir con una partida abierta corta la pantalla del host: se confirma primero. */}
+        <button className={`${QUIET} shrink-0`} key={cancelled ? 'returned' : 'initial'} autoFocus={cancelled}
+          aria-expanded={confirming} aria-controls="signout-confirm"
+          onClick={() => (liveCount > 0 ? setConfirming(true) : signOut())}>
+          Cerrar sesión
+        </button>
+        <div className="ml-auto flex shrink-0 items-center gap-3">
+          {role === 'admin' && <Link className={QUIET} href="/socios" transitionTypes={['nav-forward']}>Agregar socio</Link>}
+          {/* Un usuario común ve solo sus quizzes, así que la cantidad de la lista es la suya. */}
+          {role === 'user' && quizCount >= QUIZ_LIMIT
+            ? <span className="text-ink-soft">Límite de {QUIZ_LIMIT} quizzes</span>
+            : <Link className="sticker-btn-ghost sticker-btn-sm" href="/quiz/new" transitionTypes={['nav-forward']}>Nuevo quiz</Link>}
         </div>
       </header>
 
@@ -349,7 +350,7 @@ function QuizList() {
   return (
     <div className="field">
     <main className="page max-w-5xl gap-7 pb-16">
-      <AdminHeader liveCount={live.status === 'ready' ? live.games.length : 0} />
+      <AdminHeader liveCount={live.status === 'ready' ? live.games.length : 0} quizCount={list.status === 'ready' ? list.quizzes.length : 0} />
 
       {/* El título de la página va primero para lectores de pantalla; la franja de partidas se ve antes. */}
       <h1 className="sr-only">Panel de quizzes</h1>
