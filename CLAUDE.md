@@ -34,9 +34,9 @@ Database: schema lives in `supabase/migrations/` (apply as new numbered migratio
 - `useGame` loads the `games` row and subscribes to its `UPDATE`s; it reloads on (re)subscribe because events can be missed on reconnect.
 - `useQuestion` refetches via RPC when phase/position changes and hides a stale question until the new index arrives (otherwise the old expired timer would trigger an auto-reveal).
 - `useRemaining` corrects client clock skew using `server_now` from the RPC.
-- `players`, `answers`, `games` are in the `supabase_realtime` publication; the host screen (`src/app/host/[gameId]/page.tsx`) subscribes to player joins and answer inserts, and auto-reveals once per question when time runs out or everyone answered.
+- `players`, `answers`, `games` are in the `supabase_realtime` publication; `useHostLive` subscribes to player joins and answer inserts and is shared by the projector screen (`src/app/host/[gameId]/page.tsx`, display-only, auto-reveals once per question when time runs out or everyone answered) and the control screen (`src/app/(admin)/control/[gameId]/page.tsx`, mobile-first, where the admin drives every `host_advance` step).
 
-**Routes:** the admin lives in the `(admin)` route group so its auth gate (`(admin)/layout.tsx`) doesn't wrap `/play` or `/host`: `/` (quiz list + "start game") → `/quiz/[id]` (editor, `new` for create) → `/host/[gameId]` (projector view, QR lobby); `/play?code=XXXXXX` (player join + game, reconnects via `get_my_standing`).
+**Routes:** the admin lives in the `(admin)` route group so its auth gate (`(admin)/layout.tsx`) doesn't wrap `/play` or `/host`: `/` (quiz list + "start game") → `/quiz/[id]` (editor, `new` for create); launching opens `/host/[gameId]` (projector view, QR lobby, no controls) in a new tab and moves the admin tab to `/control/[gameId]` (game controls, usable from a phone); `/play?code=XXXXXX` (player join + game, reconnects via `get_my_standing`).
 
 **Styling:** Tailwind v4 configured in CSS (`src/app/globals.css`): New Holland brand colors in `@theme`, and shared primitives (`.page`, `.card`, `.btn`, `.btn-secondary`, `.input`, `.badge`, `.timer`) in `@layer components`. The host screen scales everything in `em` from a viewport-based base font size so it fits any projector.
 

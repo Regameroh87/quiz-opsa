@@ -1,11 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
-import Link from 'next/link'
 import QRCode from 'qrcode'
-import { supabase } from '@/lib/supabase'
-import { errorMessage, rpc, useGame, useLatest, useQuestion, useRemaining, type Game, type LeaderRow } from '@/lib/game'
+import { errorMessage, rpc, useGame, useHostLive, useLatest, useQuestion, useRemaining, type Game } from '@/lib/game'
 import { OptionButton, OptionGrid } from '@/components/OptionButton'
 import Logo from '@/components/Logo'
 
@@ -13,9 +11,6 @@ import Logo from '@/components/Logo'
 // Mundo calcomanía: campo azul con las piezas pegadas encima como stickers.
 const SCREEN = 'field flex flex-col gap-[1.4em] p-[3vw] text-[clamp(16px,1.6vw,28px)]'
 const TITLE = 'font-display text-[3.4em] leading-[0.95] text-brand [text-wrap:balance]'
-const BTN = 'w-auto! px-[1.6em]! py-[0.6em]! text-[1.1em]!'
-const ACTIONS = 'mt-auto flex items-center justify-end gap-[1em]'
-const REVEAL_LOCK_S = 2
 const URGENT_S = 5
 // Chip-sticker con troquel blanco para los datos de estado, arriba a la derecha.
 const CHIP = 'rounded-full border-[0.15em] border-white bg-navy px-[0.9em] py-[0.35em] font-bold whitespace-nowrap'
@@ -31,79 +26,17 @@ export default function Host() {
   const { game, error, setGame } = useGame({ id: gameId })
   const q = useQuestion(game)
   const remaining = useRemaining(q)
-  const [players, setPlayers] = useState<string[]>([])
-  // Respuestas contadas por pregunta, para que el conteo de la anterior no se arrastre a la nueva.
-  const [answeredFor, setAnsweredFor] = useState<{ questionId: string; n: number } | null>(null)
-  const [stats, setStats] = useState<number[]>([])
-  const [board, setBoard] = useState<LeaderRow[]>([])
-  const [actionError, setActionError] = useState('')
+  const { players, answered, stats, board } = useHostLive(game, q?.data.id)
   const autoRevealed = useRef<number | null>(null)
 
   const phase = game?.phase
   const pos = game?.current_position
   const playerCount = useLatest(players.length)
-  const questionId = q?.data.id
-  const currentQuestionId = useLatest(questionId)
-  const answered = answeredFor && answeredFor.questionId === questionId ? answeredFor.n : 0
 
-  // Mientras corre un paso, los botones de avance se deshabilitan: un doble clic no debe avanzar dos veces.
-  const [advancing, setAdvancing] = useState(false)
-  const advance = async (action: string) => {
-    setActionError('')
-    setAdvancing(true)
-    try {
-      // Se aplica la respuesta directo, sin esperar el aviso de Realtime.
-      setGame(await rpc<Game>('host_advance', { p_game_id: gameId, p_action: action }))
-    } catch (e) {
-      setActionError(errorMessage(e))
-    } finally {
-      setAdvancing(false)
-    }
-  }
-  // "Revelar ya" no acepta clics en los primeros segundos: un clic de más en "Empezar"/"Siguiente"
-  // no puede cerrar la pregunta que se acaba de abrir.
-  const justOpened = !!q && remaining !== null && remaining > q.data.time_limit_s - REVEAL_LOCK_S
-
-  // Jugadores en vivo
-  useEffect(() => {
-    const load = () =>
-      supabase.from('players').select('nickname').eq('game_id', gameId).order('created_at')
-        .then(({ data }) => setPlayers((data ?? []).map((p) => p.nickname)))
-    const ch = supabase.channel(`players-${gameId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` },
-        (p) => setPlayers((prev) => [...prev, (p.new as { nickname: string }).nickname]))
-      .subscribe((s) => s === 'SUBSCRIBED' && load())
-    return () => { void supabase.removeChannel(ch) }
-  }, [gameId])
-
-  // Respuestas en vivo: se cuentan inserts y se recarga la distribución al recibirlas o al cambiar de fase.
-  useEffect(() => {
-    const ch = supabase.channel(`answers-${gameId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'answers', filter: `game_id=eq.${gameId}` },
-        (p) => {
-          const qid = (p.new as { question_id: string }).question_id
-          if (qid !== currentQuestionId.current) return
-          setAnsweredFor((prev) => ({ questionId: qid, n: (prev?.questionId === qid ? prev.n : 0) + 1 }))
-        })
-      .subscribe()
-    return () => { void supabase.removeChannel(ch) }
-  }, [gameId, currentQuestionId])
-
-  useEffect(() => {
-    if (!questionId || (phase !== 'question' && phase !== 'reveal')) return
-    rpc<number[]>('get_answer_stats', { p_game_id: gameId })
-      .then((s) => {
-        setStats(s)
-        if (phase === 'question') setAnsweredFor({ questionId, n: s.reduce((a, b) => a + b, 0) })
-      })
-      .catch(() => {})
-  }, [gameId, phase, questionId])
-
-  useEffect(() => {
-    if (phase !== 'leaderboard' && phase !== 'finished') return
-    rpc<LeaderRow[]>('get_leaderboard', { p_game_id: gameId, p_limit: phase === 'finished' ? 3 : 5 })
-      .then(setBoard).catch(() => {})
-  }, [gameId, phase, pos])
+  // Los botones viven en el control del panel; el proyector solo revela solo, al acabarse el tiempo o si respondieron todos.
+  // Si el control ya reveló, el servidor responde invalid_transition: no hay nada que mostrarle a la sala.
+  const autoReveal = () =>
+    rpc<Game>('host_advance', { p_game_id: gameId, p_action: 'reveal' }).then(setGame).catch(() => {})
 
   // Revela solo al acabarse el tiempo o cuando todos respondieron (una vez por pregunta).
   useEffect(() => {
@@ -112,8 +45,7 @@ export default function Host() {
     if ((remaining !== null && remaining <= 0) || everyone) {
       autoRevealed.current = pos
       // Llamada al servidor disparada por el temporizador: sincroniza con un sistema externo.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      void advance('reveal')
+      void autoReveal()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, pos, remaining, answered])
@@ -177,22 +109,6 @@ export default function Host() {
               )}
             </div>
           </div>
-          <div className={ACTIONS}>
-            {/* A la izquierda: lejos del lugar donde estaban "Empezar" y "Siguiente pregunta". */}
-            {phase === 'question' && (
-              <button className={`sticker-btn-ghost mr-auto ${BTN}`} disabled={advancing || justOpened} onClick={() => advance('reveal')}>
-                Revelar ya
-              </button>
-            )}
-            {phase === 'reveal' && (
-              <>
-                <button className={`sticker-btn-ghost ${BTN}`} disabled={advancing} onClick={() => advance('leaderboard')}>Ver ranking</button>
-                <button className={`sticker-btn ${BTN}`} disabled={advancing} onClick={() => advance('next')}>
-                  {q.data.index + 1 >= q.data.total ? 'Ver resultado final' : 'Siguiente pregunta'}
-                </button>
-              </>
-            )}
-          </div>
         </>
       )}
 
@@ -209,7 +125,6 @@ export default function Host() {
               </li>
             ))}
           </ol>
-          <div className={ACTIONS}><button className={`sticker-btn ${BTN}`} disabled={advancing} onClick={() => advance('next')}>Siguiente</button></div>
         </>
       )}
 
@@ -228,24 +143,13 @@ export default function Host() {
               </div>
             ))}
           </div>
-          <div className="flex justify-center">
-            <Link className="quiet-link" href="/">Volver al panel</Link>
-          </div>
         </>
-      )}
-
-      {actionError && <p className="sticker-note" role="alert">{actionError}</p>}
-      {/* Recién con la pregunta en pantalla: mientras carga, este lugar es donde estaba "Empezar". */}
-      {(phase === 'leaderboard' || ((phase === 'question' || phase === 'reveal') && q)) && (
-        <div className="flex justify-end">
-          <button className="quiet-link" disabled={advancing} onClick={() => confirm('¿Terminar el quiz ahora?') && advance('finish')}>Terminar quiz</button>
-        </div>
       )}
     </div>
   )
 }
 
-// "Empezar" vive en el panel admin: el proyector solo muestra cómo sumarse.
+// Los controles viven en el panel admin: el proyector solo muestra cómo sumarse.
 function Lobby({ code, players }: { code: string; players: string[] }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const url = `${location.origin}/play?code=${code}`

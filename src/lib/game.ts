@@ -151,3 +151,65 @@ export function useLatest<T>(value: T) {
   useLayoutEffect(() => { ref.current = value })
   return ref
 }
+
+/**
+ * Lo que ve el anfitrión en vivo: jugadores, respuestas a la pregunta actual, distribución y ranking.
+ * Lo comparten la pantalla del proyector y el control desde el panel.
+ */
+export function useHostLive(game: Game | null, questionId: string | undefined) {
+  const gameId = game?.id
+  const phase = game?.phase
+  const pos = game?.current_position
+  const [players, setPlayers] = useState<string[]>([])
+  // Respuestas contadas por pregunta, para que el conteo de la anterior no se arrastre a la nueva.
+  const [answeredFor, setAnsweredFor] = useState<{ questionId: string; n: number } | null>(null)
+  const [stats, setStats] = useState<number[]>([])
+  const [board, setBoard] = useState<LeaderRow[]>([])
+  const currentQuestionId = useLatest(questionId)
+
+  // Jugadores en vivo
+  useEffect(() => {
+    if (!gameId) return
+    const load = () =>
+      supabase.from('players').select('nickname').eq('game_id', gameId).order('created_at')
+        .then(({ data }) => setPlayers((data ?? []).map((p) => p.nickname)))
+    const ch = supabase.channel(`players-${gameId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` },
+        (p) => setPlayers((prev) => [...prev, (p.new as { nickname: string }).nickname]))
+      .subscribe((s) => s === 'SUBSCRIBED' && load())
+    return () => { void supabase.removeChannel(ch) }
+  }, [gameId])
+
+  // Respuestas en vivo: se cuentan inserts y se recarga la distribución al cambiar de fase.
+  useEffect(() => {
+    if (!gameId) return
+    const ch = supabase.channel(`answers-${gameId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'answers', filter: `game_id=eq.${gameId}` },
+        (p) => {
+          const qid = (p.new as { question_id: string }).question_id
+          if (qid !== currentQuestionId.current) return
+          setAnsweredFor((prev) => ({ questionId: qid, n: (prev?.questionId === qid ? prev.n : 0) + 1 }))
+        })
+      .subscribe()
+    return () => { void supabase.removeChannel(ch) }
+  }, [gameId, currentQuestionId])
+
+  useEffect(() => {
+    if (!gameId || !questionId || (phase !== 'question' && phase !== 'reveal')) return
+    rpc<number[]>('get_answer_stats', { p_game_id: gameId })
+      .then((s) => {
+        setStats(s)
+        if (phase === 'question') setAnsweredFor({ questionId, n: s.reduce((a, b) => a + b, 0) })
+      })
+      .catch(() => {})
+  }, [gameId, phase, questionId])
+
+  useEffect(() => {
+    if (!gameId || (phase !== 'leaderboard' && phase !== 'finished')) return
+    rpc<LeaderRow[]>('get_leaderboard', { p_game_id: gameId, p_limit: phase === 'finished' ? 3 : 5 })
+      .then(setBoard).catch(() => {})
+  }, [gameId, phase, pos])
+
+  const answered = answeredFor && answeredFor.questionId === questionId ? answeredFor.n : 0
+  return { players, answered, stats, board }
+}

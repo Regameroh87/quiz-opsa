@@ -46,7 +46,8 @@ async function fetchLiveGames(): Promise<LiveState> {
   return error ? { status: 'error' } : { status: 'ready', games: data as unknown as LiveGame[] }
 }
 
-function phaseLabel(g: LiveGame, players: number) {
+function phaseLabel(g: LiveGame) {
+  const players = g.players[0]?.count ?? 0
   const who = `${players} ${players === 1 ? 'jugador' : 'jugadores'}`
   if (g.phase === 'lobby') return `En sala de espera · código ${g.code} · ${who}`
   const total = g.quizzes?.questions[0]?.count
@@ -54,37 +55,12 @@ function phaseLabel(g: LiveGame, players: number) {
   return `${g.phase === 'leaderboard' ? `${n} · mostrando ranking` : n} · ${who}`
 }
 
-/** Jugadores en vivo de las salas de espera: el panel decide cuándo empezar, así que el conteo no puede quedar viejo. */
-function useLobbyPlayers(ids: string[]) {
-  const [counts, setCounts] = useState<Record<string, number>>({})
-  const key = ids.join(',')
-  useEffect(() => {
-    if (!key) return
-    const list = key.split(',')
-    const load = () => supabase.from('players').select('game_id').in('game_id', list)
-      .then(({ data }) => data && setCounts(Object.fromEntries(list.map((id) => [id, data.filter((p) => p.game_id === id).length]))))
-    const ch = supabase.channel('admin-lobby-players')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `game_id=in.(${key})` },
-        (p) => {
-          const id = (p.new as { game_id: string }).game_id
-          setCounts((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }))
-        })
-      // Se recarga al (re)suscribirse: en una reconexión se pueden perder avisos.
-      .subscribe((st) => st === 'SUBSCRIBED' && load())
-    return () => { void supabase.removeChannel(ch) }
-  }, [key])
-  return counts
-}
-
-/** Partidas propias sin terminar: empezar la que está en sala de espera, volver a la sala si se cerró la pestaña del host, o cerrar una abandonada. */
+/** Partidas propias sin terminar: seguir controlándolas (también desde el celular), reabrir el proyector o cerrar una abandonada. */
 function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () => void; onChanged: () => void }) {
   const [confirming, setConfirming] = useState<string | null>(null)
   const [cancelled, setCancelled] = useState<string | null>(null)
   const [finishing, setFinishing] = useState<string | null>(null)
-  const [starting, setStarting] = useState<string | null>(null)
   const [error, setError] = useState<{ gameId: string; message: string } | null>(null)
-  const counts = useLobbyPlayers(live.status === 'ready' ? live.games.filter((g) => g.phase === 'lobby').map((g) => g.id) : [])
-  const playersOf = (g: LiveGame) => counts[g.id] ?? g.players[0]?.count ?? 0
 
   const cancel = () => { setCancelled(confirming); setConfirming(null) }
   const finish = async (gameId: string) => {
@@ -98,19 +74,6 @@ function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () 
       setError({ gameId, message: errorMessage(e) })
     } finally {
       setFinishing(null)
-    }
-  }
-  // La pantalla del proyector escucha los cambios de la partida y pasa sola a la primera pregunta.
-  const start = async (gameId: string) => {
-    setStarting(gameId)
-    setError(null)
-    try {
-      await rpc<Game>('host_advance', { p_game_id: gameId, p_action: 'start' })
-      onChanged()
-    } catch (e) {
-      setError({ gameId, message: errorMessage(e) })
-    } finally {
-      setStarting(null)
     }
   }
 
@@ -144,7 +107,7 @@ function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () 
               aria-busy={finishing === g.id}>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <strong id={titleId} className="text-[1.2rem] break-words">{g.quizzes?.title ?? 'Quiz'}</strong>
-                <span id={phaseId} className="text-ink-soft">{phaseLabel(g, playersOf(g))}</span>
+                <span id={phaseId} className="text-ink-soft">{phaseLabel(g)}</span>
                 {confirming === g.id ? (
                   <div key="confirm" className="flex flex-wrap items-center gap-x-4 gap-y-2"
                     onKeyDown={(e) => e.key === 'Escape' && cancel()}>
@@ -163,14 +126,10 @@ function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () 
                 {error?.gameId === g.id && <p className="sticker-note" role="alert" tabIndex={-1} ref={focusOnMount}>{error.message}</p>}
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-3">
-                {/* En sala de espera la acción principal es empezar; volver a la sala pasa a secundaria. */}
-                <Link className={`${g.phase === 'lobby' ? 'sticker-btn-ghost' : 'sticker-btn'} sticker-btn-sm`} href={`/host/${g.id}`} target="_blank" aria-describedby={`${titleId} ${phaseId}`}>Volver a la sala<span className="sr-only"> (se abre en otra pestaña)</span></Link>
-                {g.phase === 'lobby' && (
-                  <button className="sticker-btn sticker-btn-sm" disabled={playersOf(g) === 0 || !!starting || !!finishing}
-                    aria-describedby={`${titleId} ${phaseId}`} onClick={() => start(g.id)}>
-                    {starting === g.id ? 'Empezando…' : 'Empezar'}
-                  </button>
-                )}
+                <Link className="sticker-btn-ghost sticker-btn-sm" href={`/host/${g.id}`} target="_blank" aria-describedby={titleId}>
+                  Proyector<span className="sr-only"> (se abre en otra pestaña)</span>
+                </Link>
+                <Link className="sticker-btn sticker-btn-sm" href={`/control/${g.id}`} aria-describedby={`${titleId} ${phaseId}`}>Controlar</Link>
               </div>
             </li>
           )
@@ -310,12 +269,11 @@ export default function QuizList() {
     setCardError(null)
     try {
       const game = await rpc<Game>('create_game', { p_quiz_id: quizId })
-      // El panel queda en esta pestaña; la sala va a la nueva, que es la que se lleva al proyector.
+      // La sala va a la pestaña nueva, que es la que se lleva al proyector; esta pasa al control.
+      // Si el navegador bloqueó la pestaña, el control ofrece abrir el proyector.
       if (tab) tab.location.href = `/host/${game.id}`
-      else router.push(`/host/${game.id}`)
-      // Con la partida abierta, el quiz pasa a mostrar "Volver a la sala" en vez de crear otra.
-      await fetchLiveGames().then(setLive)
-      setBusy(null)
+      // Se mantiene bloqueado hasta que carga el control, para no crear otra partida.
+      router.push(`/control/${game.id}`)
     } catch (e) {
       tab?.close()
       // Otro admin pudo haberle quitado las preguntas desde que se cargó la lista.
@@ -362,7 +320,7 @@ export default function QuizList() {
       <div className="flex flex-col gap-2">
         <h2 className="font-display text-[clamp(2.4rem,5vw,3.4rem)] leading-none text-brand">Tus quizzes</h2>
         {/* La notebook a veces se duplica en el proyector: que nadie se sorprenda al lanzar. */}
-        {listReady && list.status === 'ready' && list.quizzes.length > 0 && <p className="max-w-[60ch] text-ink-soft">Al lanzar, la sala de espera con el código QR se abre en otra pestaña: llevala al proyector y este panel queda acá.</p>}
+        {listReady && list.status === 'ready' && list.quizzes.length > 0 && <p className="max-w-[60ch] text-ink-soft">Al lanzar, la sala de espera con el código QR se abre en otra pestaña para el proyector, y esta pasa al control de la partida. El control también se usa desde el celular: entrá al panel y tocá «Controlar».</p>}
       </div>
 
       {!listReady && <p className="font-display text-2xl text-white" role="status">Cargando quizzes…</p>}
@@ -440,8 +398,8 @@ export default function QuizList() {
                   )}
                 </div>
                 {openGameByQuiz.has(q.id) ? (
-                  <Link className="sticker-btn-ghost sticker-btn-sm self-start" href={`/host/${openGameByQuiz.get(q.id)}`} target="_blank" aria-describedby={titleId}>
-                    Volver a la sala<span className="sr-only"> (se abre en otra pestaña)</span>
+                  <Link className="sticker-btn-ghost sticker-btn-sm self-start" href={`/control/${openGameByQuiz.get(q.id)}`} aria-describedby={titleId}>
+                    Controlar partida
                   </Link>
                 ) : (
                   <button className="sticker-btn sticker-btn-sm self-start" disabled={!!busy || empty} aria-describedby={`${titleId} ${metaId}`} onClick={() => launch(q.id)}>
