@@ -143,12 +143,14 @@ function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () 
 /** Encabezado: marca, quién está logueado en la notebook compartida, cómo salir y "Nuevo quiz". */
 function AdminHeader({ liveCount }: { liveCount: number }) {
   const [email, setEmail] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
   const [confirming, setConfirming] = useState(false)
   // Al cancelar, el foco vuelve a "Cerrar sesión" en vez de perderse en <body>.
   const [cancelled, setCancelled] = useState(false)
   const cancel = () => { setConfirming(false); setCancelled(true) }
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => setEmail(data.session?.user.email ?? ''))
+    void supabase.from('admins').select('role').maybeSingle().then(({ data }) => setIsAdmin(data?.role === 'admin'))
   }, [])
 
   // Scope local: cierra solo esta notebook, no las sesiones del admin en otros equipos.
@@ -168,7 +170,10 @@ function AdminHeader({ liveCount }: { liveCount: number }) {
             Cerrar sesión
           </button>
         </div>
-        <Link className="sticker-btn-ghost sticker-btn-sm shrink-0" href="/quiz/new" transitionTypes={['nav-forward']}>Nuevo quiz</Link>
+        <div className="flex shrink-0 items-center gap-3">
+          {isAdmin && <Link className={QUIET} href="/socios" transitionTypes={['nav-forward']}>Agregar socio</Link>}
+          <Link className="sticker-btn-ghost sticker-btn-sm" href="/quiz/new" transitionTypes={['nav-forward']}>Nuevo quiz</Link>
+        </div>
       </header>
 
       {/* Aviso de ancho completo debajo del encabezado: no desarma la fila de arriba. */}
