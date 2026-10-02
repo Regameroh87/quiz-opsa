@@ -3,6 +3,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
+import { useFitHeight } from '@/lib/fit'
 import { errorMessage, rpc, useGame, useHostLive, useLatest, useQuestion, useRemaining, type Game, type Player } from '@/lib/game'
 import { OptionButton, OptionGrid } from '@/components/OptionButton'
 import Logo from '@/components/Logo'
@@ -11,7 +12,11 @@ import Avatar, { AVATARS } from '@/components/Avatar'
 
 // Pantalla del proyector: todo escala en em a partir del font-size base.
 // Mundo calcomanía: campo azul con las piezas pegadas encima como stickers.
-const SCREEN = 'field flex flex-col gap-[1.4em] p-[3vw] text-[clamp(16px,1.6vw,28px)]'
+const SCREEN = 'field flex h-dvh flex-col gap-[1.4em] overflow-hidden p-[3vw] text-[clamp(16px,1.6vw,28px)]'
+// Si una pregunta, unas opciones o una explicación largas no entran en el alto, se achica la letra base
+// (todo está en em) hasta que entren: en un proyector nadie hace scroll. Mismo clamp que SCREEN.
+const MIN_SCALE = 0.5
+const scaleFont = (box: HTMLElement, k: number) => { box.style.fontSize = k === 1 ? '' : `calc(clamp(16px,1.6vw,28px) * ${k})` }
 const TITLE = 'font-display text-[3.4em] leading-[0.95] text-brand [text-wrap:balance]'
 const URGENT_S = 5
 // Chip-sticker con troquel blanco para los datos de estado, arriba a la derecha.
@@ -39,6 +44,7 @@ function Host({ gameId }: { gameId: string }) {
   const phase = game?.phase
   const pos = game?.current_position
   const playerCount = useLatest(players.length)
+  const fit = useFitHeight(scaleFont, MIN_SCALE)
 
   // Si desde el control se lanzó otro quiz, este proyector pasa solo a la sala nueva.
   // Navegación del lado del cliente: se mantiene la pantalla completa.
@@ -72,7 +78,7 @@ function Host({ gameId }: { gameId: string }) {
   const urgent = phase === 'question' && remaining !== null && remaining <= URGENT_S
 
   return (
-    <div className={SCREEN}>
+    <div ref={fit} className={SCREEN}>
       <FullscreenButton />
       <header className="flex flex-wrap items-center gap-[1em]">
         <Logo height={44} />

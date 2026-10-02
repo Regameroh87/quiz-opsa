@@ -4,12 +4,31 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ensureSession, supabase } from '@/lib/supabase'
 import { errorMessage, rpc, useGame, useLeaderboard, useQuestion, useRemaining, type Standing } from '@/lib/game'
+import { useFitHeight } from '@/lib/fit'
 import { OptionButton, OptionGrid } from '@/components/OptionButton'
 import Avatar, { AVATARS, type AvatarId } from '@/components/Avatar'
 import Logo from '@/components/Logo'
 import PageTransition from '@/components/PageTransition'
 
 const URGENT_S = 5
+// Lo más que se achica el juego para entrar en la pantalla; más chico ya no se lee y conviene el scroll.
+const MIN_ZOOM = 0.6
+
+// El juego se achica con zoom: el texto se reacomoda al ancho en vez de quedar una columna angosta.
+const zoomContent = (box: HTMLElement, k: number) => { (box.firstElementChild as HTMLElement).style.zoom = String(k) }
+
+/**
+ * Pantalla de alto fijo para el juego: una pregunta o unas opciones largas se achican para entrar
+ * en vez de obligar a hacer scroll. Si ni con MIN_ZOOM entra, queda el scroll.
+ */
+function FitScreen({ children }: { children: React.ReactNode }) {
+  const fit = useFitHeight(zoomContent, MIN_ZOOM)
+  return (
+    <div ref={fit} className="field h-dvh overflow-y-auto">
+      <main className="page min-h-0 gap-5">{children}</main>
+    </div>
+  )
+}
 
 /** Estado de espera a pantalla completa, en amarillo sobre el campo. */
 function Status({ children }: { children: React.ReactNode }) {
@@ -179,121 +198,119 @@ function PlayGame({ code }: { code: string }) {
   const seconds = Math.ceil(remaining ?? 0)
 
   return (
-    <div className="field">
-      <main className="page gap-5">
-        {/* Quién soy y cuánto llevo: siempre a la vista. */}
-        <header className="flex items-center gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border-[3px] border-white bg-navy py-1 pr-4 pl-1 shadow-[0_4px_0_rgb(0_20_60/0.4)]">
-            <Avatar id={standing?.avatar} className="size-9 border-2" />
-            <span className="truncate font-bold">{standing?.nickname ?? ''}</span>
+    <FitScreen>
+      {/* Quién soy y cuánto llevo: siempre a la vista. */}
+      <header className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border-[3px] border-white bg-navy py-1 pr-4 pl-1 shadow-[0_4px_0_rgb(0_20_60/0.4)]">
+          <Avatar id={standing?.avatar} className="size-9 border-2" />
+          <span className="truncate font-bold">{standing?.nickname ?? ''}</span>
+        </div>
+        <span className="rounded-full border-[3px] border-white bg-white px-4 py-1.5 font-black text-navy tabular-nums shadow-[0_4px_0_#8fa6d8]">
+          {standing?.score ?? 0} pts
+        </span>
+      </header>
+
+      {phase === 'lobby' && (
+        <section className="sticker-card stick-in mx-auto mt-16 flex flex-col items-center gap-3" role="status">
+          <Avatar id={standing?.avatar} className="-mt-20 size-28 border-[6px] shadow-[0_8px_0_rgb(0_20_60/0.4)]" />
+          <h1 className="sticker-title text-[44px]">¡Estás dentro!</h1>
+          <p className="font-bold text-ink-soft">Mirá la pantalla: el quiz arranca en un ratito.</p>
+        </section>
+      )}
+
+      {phase === 'question' && q && (
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-bold text-ink-soft">Pregunta {q.data.index + 1} de {q.data.total}</p>
+            <span aria-live="off"
+              className={`flex size-14 flex-none items-center justify-center rounded-full border-4 border-white font-display text-2xl tabular-nums shadow-[0_4px_0_rgb(0_20_60/0.4)] ${remaining !== null && remaining <= URGENT_S ? 'bg-alert text-white' : 'bg-white text-navy'}`}>
+              {seconds}
+            </span>
           </div>
-          <span className="rounded-full border-[3px] border-white bg-white px-4 py-1.5 font-black text-navy tabular-nums shadow-[0_4px_0_#8fa6d8]">
-            {standing?.score ?? 0} pts
-          </span>
-        </header>
+          <h1 key={q.data.id} className="sticker-panel stick-in px-5 py-4 text-xl leading-snug font-extrabold" style={{ '--tilt': '-0.5deg' } as React.CSSProperties}>
+            {q.data.text}
+          </h1>
+          {q.data.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
+            <img src={q.data.image_url} alt="" className="mx-auto max-h-[28vh] w-auto rounded-2xl border-4 border-white object-contain" />
+          )}
+          {answered ? (
+            <section className="sticker-card stick-in mx-auto flex flex-col items-center gap-2" role="status">
+              <p className="sticker-title text-[40px]">¡Enviada!</p>
+              <p className="font-bold text-ink-soft">Esperá el resultado en la pantalla.</p>
+            </section>
+          ) : (
+            <OptionGrid>
+              {q.data.options.map((o, i) => (
+                <OptionButton key={i} index={i} label={o} onClick={() => answer(i)} disabled={(remaining ?? 0) <= 0} />
+              ))}
+            </OptionGrid>
+          )}
+          {submitError && <p className="sticker-note" role="alert">{submitError}</p>}
+        </>
+      )}
 
-        {phase === 'lobby' && (
-          <section className="sticker-card stick-in mx-auto mt-16 flex flex-col items-center gap-3" role="status">
-            <Avatar id={standing?.avatar} className="-mt-20 size-28 border-[6px] shadow-[0_8px_0_rgb(0_20_60/0.4)]" />
-            <h1 className="sticker-title text-[44px]">¡Estás dentro!</h1>
-            <p className="font-bold text-ink-soft">Mirá la pantalla: el quiz arranca en un ratito.</p>
-          </section>
-        )}
+      {(phase === 'reveal' || phase === 'leaderboard') && standing && (
+        <section role="status"
+          className={`sticker-card stick-in mx-auto flex flex-col items-center gap-2 ${!standing.answered ? '' : standing.last_correct ? 'bg-opt-3!' : 'bg-alert!'}`}>
+          <p className="font-display text-[40px] leading-none text-white">
+            {!standing.answered ? 'Sin respuesta' : standing.last_correct ? '¡Correcto!' : 'Incorrecto'}
+          </p>
+          {standing.answered
+            ? <p className="font-display text-6xl leading-none text-white">+{standing.last_points ?? 0}</p>
+            : <p className="font-bold text-ink-soft">No respondiste a tiempo.</p>}
+          <p className="mt-2 font-bold">Vas en el puesto <span className="font-display text-2xl">#{standing.rank}</span></p>
+        </section>
+      )}
+      {/* El mismo top 5 que muestra el proyector; el jugador se ve resaltado si está entre ellos. */}
+      {phase === 'leaderboard' && board.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="font-display text-3xl leading-none text-brand">Ranking</h2>
+          <ol className="flex flex-col gap-2">
+            {board.map((r, i) => {
+              const me = r.nickname === standing?.nickname
+              return (
+                <li key={r.nickname} className={`sticker-panel stick-in flex items-center gap-3 px-3 py-2 ${me ? 'bg-brand! text-brand-contrast!' : ''}`}
+                  style={{ '--tilt': i % 2 ? '0.4deg' : '-0.4deg', '--delay': `${i * 90}ms` } as React.CSSProperties}>
+                  <span className={`flex size-8 flex-none items-center justify-center rounded-full font-display ${me ? 'bg-white text-navy' : r.rank === 1 ? 'bg-brand text-brand-contrast' : 'bg-white text-navy'}`}>{r.rank}</span>
+                  <Avatar id={r.avatar} className="size-9 border-2" />
+                  <span className="min-w-0 flex-1 truncate font-bold">{r.nickname}{me && <span className="sr-only"> (vos)</span>}</span>
+                  <span className="font-extrabold tabular-nums">{r.score} <span className={`text-xs font-semibold ${me ? '' : 'text-ink-soft'}`}>pts</span></span>
+                </li>
+              )
+            })}
+          </ol>
+        </section>
+      )}
+      {/* Si erró o no respondió, ve cuál era la correcta (con su color y forma), haya explicación o no. */}
+      {phase === 'reveal' && q && q.data.correct_index != null && standing && !standing.last_correct && (
+        <section className="flex flex-col gap-2">
+          <p className="font-bold text-ink-soft">La correcta era</p>
+          <OptionButton index={q.data.correct_index} label={q.data.options[q.data.correct_index]} correct />
+        </section>
+      )}
+      {/* Lo mismo que muestra la pantalla al revelar, por si el proyector no se ve bien. */}
+      {phase === 'reveal' && q && (q.data.reveal_image_url || q.data.reveal_text) && (
+        <section className="sticker-panel flex flex-col gap-3 p-5" style={{ '--tilt': '0.5deg' } as React.CSSProperties}>
+          {q.data.reveal_image_url && (
+            // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
+            <img src={q.data.reveal_image_url} alt="" className="mx-auto max-h-[35vh] w-auto rounded-2xl object-contain" />
+          )}
+          {q.data.reveal_text && <p className="font-semibold whitespace-pre-line">{q.data.reveal_text}</p>}
+        </section>
+      )}
 
-        {phase === 'question' && q && (
-          <>
-            <div className="flex items-center justify-between gap-3">
-              <p className="font-bold text-ink-soft">Pregunta {q.data.index + 1} de {q.data.total}</p>
-              <span aria-live="off"
-                className={`flex size-14 flex-none items-center justify-center rounded-full border-4 border-white font-display text-2xl tabular-nums shadow-[0_4px_0_rgb(0_20_60/0.4)] ${remaining !== null && remaining <= URGENT_S ? 'bg-alert text-white' : 'bg-white text-navy'}`}>
-                {seconds}
-              </span>
-            </div>
-            <h1 key={q.data.id} className="sticker-panel stick-in px-5 py-4 text-xl leading-snug font-extrabold" style={{ '--tilt': '-0.5deg' } as React.CSSProperties}>
-              {q.data.text}
-            </h1>
-            {q.data.image_url && (
-              // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
-              <img src={q.data.image_url} alt="" className="mx-auto max-h-[28vh] w-auto rounded-2xl border-4 border-white object-contain" />
-            )}
-            {answered ? (
-              <section className="sticker-card stick-in mx-auto flex flex-col items-center gap-2" role="status">
-                <p className="sticker-title text-[40px]">¡Enviada!</p>
-                <p className="font-bold text-ink-soft">Esperá el resultado en la pantalla.</p>
-              </section>
-            ) : (
-              <OptionGrid>
-                {q.data.options.map((o, i) => (
-                  <OptionButton key={i} index={i} label={o} onClick={() => answer(i)} disabled={(remaining ?? 0) <= 0} />
-                ))}
-              </OptionGrid>
-            )}
-            {submitError && <p className="sticker-note" role="alert">{submitError}</p>}
-          </>
-        )}
-
-        {(phase === 'reveal' || phase === 'leaderboard') && standing && (
-          <section role="status"
-            className={`sticker-card stick-in mx-auto flex flex-col items-center gap-2 ${!standing.answered ? '' : standing.last_correct ? 'bg-opt-3!' : 'bg-alert!'}`}>
-            <p className="font-display text-[40px] leading-none text-white">
-              {!standing.answered ? 'Sin respuesta' : standing.last_correct ? '¡Correcto!' : 'Incorrecto'}
-            </p>
-            {standing.answered
-              ? <p className="font-display text-6xl leading-none text-white">+{standing.last_points ?? 0}</p>
-              : <p className="font-bold text-ink-soft">No respondiste a tiempo.</p>}
-            <p className="mt-2 font-bold">Vas en el puesto <span className="font-display text-2xl">#{standing.rank}</span></p>
-          </section>
-        )}
-        {/* El mismo top 5 que muestra el proyector; el jugador se ve resaltado si está entre ellos. */}
-        {phase === 'leaderboard' && board.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <h2 className="font-display text-3xl leading-none text-brand">Ranking</h2>
-            <ol className="flex flex-col gap-2">
-              {board.map((r, i) => {
-                const me = r.nickname === standing?.nickname
-                return (
-                  <li key={r.nickname} className={`sticker-panel stick-in flex items-center gap-3 px-3 py-2 ${me ? 'bg-brand! text-brand-contrast!' : ''}`}
-                    style={{ '--tilt': i % 2 ? '0.4deg' : '-0.4deg', '--delay': `${i * 90}ms` } as React.CSSProperties}>
-                    <span className={`flex size-8 flex-none items-center justify-center rounded-full font-display ${me ? 'bg-white text-navy' : r.rank === 1 ? 'bg-brand text-brand-contrast' : 'bg-white text-navy'}`}>{r.rank}</span>
-                    <Avatar id={r.avatar} className="size-9 border-2" />
-                    <span className="min-w-0 flex-1 truncate font-bold">{r.nickname}{me && <span className="sr-only"> (vos)</span>}</span>
-                    <span className="font-extrabold tabular-nums">{r.score} <span className={`text-xs font-semibold ${me ? '' : 'text-ink-soft'}`}>pts</span></span>
-                  </li>
-                )
-              })}
-            </ol>
-          </section>
-        )}
-        {/* Si erró o no respondió, ve cuál era la correcta (con su color y forma), haya explicación o no. */}
-        {phase === 'reveal' && q && q.data.correct_index != null && standing && !standing.last_correct && (
-          <section className="flex flex-col gap-2">
-            <p className="font-bold text-ink-soft">La correcta era</p>
-            <OptionButton index={q.data.correct_index} label={q.data.options[q.data.correct_index]} correct />
-          </section>
-        )}
-        {/* Lo mismo que muestra la pantalla al revelar, por si el proyector no se ve bien. */}
-        {phase === 'reveal' && q && (q.data.reveal_image_url || q.data.reveal_text) && (
-          <section className="sticker-panel flex flex-col gap-3 p-5" style={{ '--tilt': '0.5deg' } as React.CSSProperties}>
-            {q.data.reveal_image_url && (
-              // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
-              <img src={q.data.reveal_image_url} alt="" className="mx-auto max-h-[35vh] w-auto rounded-2xl object-contain" />
-            )}
-            {q.data.reveal_text && <p className="font-semibold whitespace-pre-line">{q.data.reveal_text}</p>}
-          </section>
-        )}
-
-        {phase === 'finished' && standing && (
-          <section className="sticker-card stick-in mx-auto mt-16 flex flex-col items-center gap-2">
-            <Avatar id={standing.avatar} className="-mt-20 size-28 border-[6px] shadow-[0_8px_0_rgb(0_20_60/0.4)]" />
-            <h1 className="sticker-title text-[44px]">¡Fin del quiz!</h1>
-            <p className="font-bold text-ink-soft">Terminaste en el puesto</p>
-            <p className="font-display text-7xl leading-none text-white">#{standing.rank}</p>
-            <p className="font-bold">{standing.score} puntos</p>
-          </section>
-        )}
-        {phase === 'finished' && game.next_game_id && standing && <NextGame gameId={game.next_game_id} standing={standing} />}
-      </main>
-    </div>
+      {phase === 'finished' && standing && (
+        <section className="sticker-card stick-in mx-auto mt-16 flex flex-col items-center gap-2">
+          <Avatar id={standing.avatar} className="-mt-20 size-28 border-[6px] shadow-[0_8px_0_rgb(0_20_60/0.4)]" />
+          <h1 className="sticker-title text-[44px]">¡Fin del quiz!</h1>
+          <p className="font-bold text-ink-soft">Terminaste en el puesto</p>
+          <p className="font-display text-7xl leading-none text-white">#{standing.rank}</p>
+          <p className="font-bold">{standing.score} puntos</p>
+        </section>
+      )}
+      {phase === 'finished' && game.next_game_id && standing && <NextGame gameId={game.next_game_id} standing={standing} />}
+    </FitScreen>
   )
 }
 
