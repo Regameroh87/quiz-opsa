@@ -12,9 +12,12 @@ import { useCallback } from 'react'
 export function useFitHeight(apply: (box: HTMLElement, scale: number) => void, min: number) {
   return useCallback((box: HTMLElement | null) => {
     if (!box) return
+    // También los hijos directos: lo que desborda una fila con alto propio (flex-1) no siempre cuenta
+    // en el scroll de la pantalla y se comería el margen de abajo.
+    const overflows = (el: Element) => el.scrollHeight > el.clientHeight + 1
     const fits = (k: number) => {
       apply(box, k)
-      return box.scrollHeight <= box.clientHeight + 1
+      return !overflows(box) && !Array.from(box.children).some(overflows)
     }
     const fit = () => {
       if (fits(1)) return

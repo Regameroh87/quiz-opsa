@@ -107,7 +107,8 @@ function Host({ gameId }: { gameId: string }) {
             style={{ '--tilt': '-0.5deg' } as React.CSSProperties}>
             {q.data.text}
           </h1>
-          <div className="flex min-h-0 flex-1 items-center gap-[2vw]">
+          {/* center-safe: si no entra desborda hacia abajo (lo detecta useFitHeight) y no tapa la pregunta. */}
+          <div className="flex min-h-0 flex-1 items-center-safe gap-[2vw]">
             {/* Al revelar, la imagen de la respuesta (si hay) reemplaza a la de la pregunta. */}
             {image && (
               // eslint-disable-next-line @next/next/no-img-element -- ya viene optimizada desde R2
