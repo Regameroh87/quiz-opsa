@@ -186,12 +186,16 @@
 }
 
 /* useFitHeight (src/lib/fit.ts) mide el alto sin transforms: !important le gana a la animación en curso
-   sin tocar `animation` (no la reinicia). Solo dura lo que dura la medición, en el mismo frame. */
+   sin tocar `animation` (no la reinicia). Solo dura lo que dura la medición, en el mismo frame.
+   transform va en otra regla a propósito: juntas, el minificador (Lightning CSS) las fusiona en un
+   `transform: translate(0) rotate(0) scale(1)` y rotate/translate/scale (las inclinaciones) quedan vivas. */
 [data-fit-measuring], [data-fit-measuring] * {
-  transform: none !important;
   translate: none !important;
   rotate: none !important;
   scale: none !important;
+}
+:is([data-fit-measuring], [data-fit-measuring] *) {
+  transform: none !important;
 }
 
 /* View Transitions entre pantallas (ver components/PageTransition.tsx). */
