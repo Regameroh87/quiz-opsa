@@ -205,7 +205,8 @@ export function useHostLive(game: Game | null, questionId: string | undefined) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` },
         (p) => {
           const { nickname, avatar } = p.new as Player
-          setPlayers((prev) => [...prev, { nickname, avatar }])
+          // Si el aviso llega después de la recarga, el jugador ya está: duplicado inflaría el "de N".
+          setPlayers((prev) => prev.some((x) => x.nickname === nickname) ? prev : [...prev, { nickname, avatar }])
         })
       .subscribe((s) => s === 'SUBSCRIBED' && load())
     const offVisible = onVisible(() => void load())
@@ -215,30 +216,49 @@ export function useHostLive(game: Game | null, questionId: string | undefined) {
     }
   }, [gameId])
 
-  // Respuestas en vivo: se cuentan inserts y se recarga la distribución al cambiar de fase.
+  // Respuestas en vivo: cada insert recarga el conteo real del servidor. Sumar los avisos uno por uno
+  // se pisaba con la recarga y podía quedar uno abajo para siempre.
+  const reloadStats = useRef<() => void>(() => {})
   useEffect(() => {
     if (!gameId) return
     const ch = liveChannel(`answers-${gameId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'answers', filter: `game_id=eq.${gameId}` },
         (p) => {
-          const qid = (p.new as { question_id: string }).question_id
-          if (qid !== currentQuestionId.current) return
-          setAnsweredFor((prev) => ({ questionId: qid, n: (prev?.questionId === qid ? prev.n : 0) + 1 }))
+          if ((p.new as { question_id: string }).question_id === currentQuestionId.current) reloadStats.current()
         })
-      .subscribe()
+      // al reconectar se pueden haber perdido avisos
+      .subscribe((s) => s === 'SUBSCRIBED' && reloadStats.current())
     return () => { void supabase.removeChannel(ch) }
   }, [gameId, currentQuestionId])
 
   useEffect(() => {
     if (!gameId || !questionId || (phase !== 'question' && phase !== 'reveal')) return
-    const load = () => rpc<number[]>('get_answer_stats', { p_game_id: gameId })
-      .then((s) => {
-        setStats(s)
-        if (phase === 'question') setAnsweredFor({ questionId, n: s.reduce((a, b) => a + b, 0) })
-      })
-      .catch(() => {})
+    let cancelled = false
+    let seq = 0
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const load = () => {
+      const mine = ++seq
+      return rpc<number[]>('get_answer_stats', { p_game_id: gameId })
+        .then((s) => {
+          // Una respuesta vieja que llega tarde no pisa a una más nueva.
+          if (cancelled || mine !== seq) return
+          setStats(s)
+          if (phase === 'question') setAnsweredFor({ questionId, n: s.reduce((a, b) => a + b, 0) })
+        })
+        .catch(() => {})
+    }
+    // Con muchos jugadores respondiendo a la vez, una recarga cada 300 ms como mucho.
+    reloadStats.current = () => {
+      if (!timer) timer = setTimeout(() => { timer = undefined; void load() }, 300)
+    }
     void load()
-    return onVisible(() => void load())
+    const offVisible = onVisible(() => void load())
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+      reloadStats.current = () => {}
+      offVisible()
+    }
   }, [gameId, phase, questionId])
 
   const answered = answeredFor && answeredFor.questionId === questionId ? answeredFor.n : 0
