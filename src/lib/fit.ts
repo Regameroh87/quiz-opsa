@@ -12,12 +12,25 @@ import { useCallback } from 'react'
 export function useFitHeight(apply: (box: HTMLElement, scale: number) => void, min: number) {
   return useCallback((box: HTMLElement | null) => {
     if (!box) return
-    // También los hijos directos: lo que desborda una fila con alto propio (flex-1) no siempre cuenta
-    // en el scroll de la pantalla y se comería el margen de abajo.
-    const overflows = (el: Element) => el.scrollHeight > el.clientHeight + 1
+    // Se compara con las cajas y no con scrollHeight: un título con interlineado apretado "desborda" con la
+    // tinta de las letras y parecía no entrar nunca. Dos niveles: los bloques de la pantalla dentro de su
+    // padding, y lo de adentro de cada bloque (una fila flex-1 con alto propio) dentro del bloque.
+    const inFlow = (el: Element) => !['fixed', 'absolute'].includes(getComputedStyle(el).position)
+    const spills = (parent: Element, top: number, bottom: number) => Array.from(parent.children).some((c) => {
+      if (!inFlow(c)) return false
+      const r = c.getBoundingClientRect()
+      return r.height > 0 && (r.top < top - 1 || r.bottom > bottom + 1)
+    })
     const fits = (k: number) => {
       apply(box, k)
-      return !overflows(box) && !Array.from(box.children).some(overflows)
+      const r = box.getBoundingClientRect()
+      const css = getComputedStyle(box)
+      if (spills(box, r.top + parseFloat(css.paddingTop), r.bottom - parseFloat(css.paddingBottom))) return false
+      return !Array.from(box.children).some((c) => {
+        if (!inFlow(c)) return false
+        const cr = c.getBoundingClientRect()
+        return spills(c, cr.top, cr.bottom)
+      })
     }
     const search = () => {
       if (fits(1)) return
