@@ -19,7 +19,7 @@ export function useFitHeight(apply: (box: HTMLElement, scale: number) => void, m
       apply(box, k)
       return !overflows(box) && !Array.from(box.children).some(overflows)
     }
-    const fit = () => {
+    const search = () => {
       if (fits(1)) return
       let lo = min
       let hi = 1
@@ -29,6 +29,16 @@ export function useFitHeight(apply: (box: HTMLElement, scale: number) => void, m
         else hi = mid
       }
       fits(lo)
+    }
+    // Se mide sin transforms (ver data-fit-measuring en globals.css): la animación de entrada agranda los
+    // stickers y, medida a mitad de camino, hacía creer que no entraban. Se saca en el mismo frame: no se ve.
+    const fit = () => {
+      box.setAttribute('data-fit-measuring', '')
+      try {
+        search()
+      } finally {
+        box.removeAttribute('data-fit-measuring')
+      }
     }
     fit()
     const ro = new ResizeObserver(fit)

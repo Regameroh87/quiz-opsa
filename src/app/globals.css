@@ -185,6 +185,15 @@
   .sticker-tile, .sticker-btn, .sticker-btn-ghost { transition: none; }
 }
 
+/* useFitHeight (src/lib/fit.ts) mide el alto sin transforms: !important le gana a la animación en curso
+   sin tocar `animation` (no la reinicia). Solo dura lo que dura la medición, en el mismo frame. */
+[data-fit-measuring], [data-fit-measuring] * {
+  transform: none !important;
+  translate: none !important;
+  rotate: none !important;
+  scale: none !important;
+}
+
 /* View Transitions entre pantallas (ver components/PageTransition.tsx). */
 ::view-transition { pointer-events: none; }
 
