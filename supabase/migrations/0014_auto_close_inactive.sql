@@ -36,6 +36,6 @@ end $$;
 
 revoke execute on function close_inactive_games(interval) from public, anon, authenticated;
 
--- Cada 10 minutos (requiere pg_cron: Database → Extensions en Supabase).
+-- Cada hora (requiere pg_cron: Database → Extensions en Supabase).
 create extension if not exists pg_cron;
-select cron.schedule('close-inactive-games', '*/10 * * * *', $$select close_inactive_games()$$);
+select cron.schedule('close-inactive-games', '0 * * * *', $$select close_inactive_games()$$);
