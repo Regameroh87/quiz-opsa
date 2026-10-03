@@ -90,6 +90,21 @@ function Control({ gameId }: { gameId: string }) {
     }
   }
 
+  // Cancelar desde la sala de espera: se corta y se cierra de una (sin podio que mostrar), y se vuelve al panel.
+  const cancelRoom = async () => {
+    setActionError('')
+    setConfirmingFinish(false)
+    setClosing(true)
+    try {
+      await rpc<Game>('host_advance', { p_game_id: gameId, p_action: 'finish' })
+      await rpc<Game>('close_game', { p_game_id: gameId })
+      router.replace('/')
+    } catch (e) {
+      setActionError(errorMessage(e))
+      setClosing(false)
+    }
+  }
+
   if (error) return <Shell><p className="sticker-note" role="alert">{errorMessage(error)}</p></Shell>
   if (!game) return <Shell><p className="font-display text-3xl text-brand" role="status">Cargando…</p></Shell>
 
@@ -228,8 +243,14 @@ function Control({ gameId }: { gameId: string }) {
         {confirmingFinish ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-navy p-3" role="alert"
             onKeyDown={(e) => e.key === 'Escape' && setConfirmingFinish(false)}>
-            <p className="min-w-0 flex-1 basis-48 text-sm font-semibold">¿Saltar al podio? Se cortan las preguntas que faltan y no se puede volver atrás.</p>
-            <button className="sticker-btn-danger" disabled={advancing} onClick={() => advance('finish')}>Ir al podio</button>
+            <p className="min-w-0 flex-1 basis-48 text-sm font-semibold">
+              {phase === 'lobby'
+                ? '¿Cancelar la partida? Se cierra la sala y no se puede volver atrás.'
+                : '¿Saltar al podio? Se cortan las preguntas que faltan y no se puede volver atrás.'}
+            </p>
+            {phase === 'lobby'
+              ? <button className="sticker-btn-danger" disabled={closing} onClick={cancelRoom}>{closing ? 'Cancelando…' : 'Cancelar partida'}</button>
+              : <button className="sticker-btn-danger" disabled={advancing} onClick={() => advance('finish')}>Ir al podio</button>}
             <button className="quiet-link" onClick={() => setConfirmingFinish(false)} autoFocus>Cancelar</button>
           </div>
         ) : (
@@ -239,8 +260,10 @@ function Control({ gameId }: { gameId: string }) {
                 Abrir el proyector<span className="sr-only"> (se abre en otra pestaña)</span>
               </a>
             )}
-            {inGame && (
-              <button className="quiet-link" disabled={advancing} onClick={() => setConfirmingFinish(true)}>Saltar al podio</button>
+            {(inGame || phase === 'lobby') && (
+              <button className="quiet-link" disabled={advancing || closing} onClick={() => setConfirmingFinish(true)}>
+                {phase === 'lobby' ? 'Cancelar partida' : 'Saltar al podio'}
+              </button>
             )}
           </div>
         )}

@@ -93,12 +93,15 @@ function LiveGames({ live, onRetry, onChanged }: { live: LiveState; onRetry: () 
   const [error, setError] = useState<{ gameId: string; message: string } | null>(null)
 
   const cancel = () => { setCancelled(confirming); setConfirming(null) }
+  const lobbyIds = new Set(live.status === 'ready' ? live.games.filter((g) => g.phase === 'lobby').map((g) => g.id) : [])
   const finish = async (gameId: string) => {
     setConfirming(null)
     setFinishing(gameId)
     setError(null)
     try {
       await rpc<Game>('host_advance', { p_game_id: gameId, p_action: 'finish' })
+      // Una sala que nunca arrancó no tiene podio que mostrar: se cierra del todo, así no queda un podio colgado.
+      if (lobbyIds.has(gameId)) await rpc<Game>('close_game', { p_game_id: gameId })
       onChanged()
     } catch (e) {
       setError({ gameId, message: errorMessage(e) })
