@@ -46,6 +46,10 @@ function QuizEditor() {
   const savedImages = useRef<string[]>([])
   const [imageError, setImageError] = useState<{ key: string; message: string } | null>(null)
   const [ai, setAi] = useState({ open: false, topic: '', count: 10, busy: false, error: '' })
+  // Ids de las preguntas armadas por la IA: al regenerar se reemplazan, las demás se conservan.
+  const [aiIds, setAiIds] = useState<string[]>([])
+  // Cuántas preguntas puede armar la IA sin pasar el tope del quiz (las suyas anteriores se reemplazan).
+  const aiRoom = AI_MAX - questions.filter((q) => !aiIds.includes(q.id) && !isEmpty(q)).length
 
   useEffect(() => {
     if (id === 'new') return
@@ -104,19 +108,23 @@ function QuizEditor() {
   // La IA arma un borrador: se revisa y se guarda con el botón de siempre.
   const generate = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (ai.busy) return
+    if (aiRoom < 1) return setAi((a) => ({ ...a, error: `El quiz ya tiene ${AI_MAX} preguntas: quitá alguna para generar más.` }))
     setAi((a) => ({ ...a, busy: true, error: '' }))
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { ...(await authHeader()), 'content-type': 'application/json' },
-        body: JSON.stringify({ topic: ai.topic.trim(), count: ai.count }),
+        body: JSON.stringify({ topic: ai.topic.trim(), count: Math.min(ai.count, aiRoom) }),
       })
       if (!res.ok) throw new Error(await res.text())
       const out = (await res.json()) as { title: string; questions: Pick<Q, 'text' | 'options' | 'correct_index' | 'reveal_text'>[] }
-      const generated = out.questions.map((g) => ({ ...blank(), ...g, options: [...g.options, '', '', ''].slice(0, 4) }))
+      const generated = out.questions.slice(0, aiRoom).map((g) => ({ ...blank(), ...g, options: [...g.options, '', '', ''].slice(0, 4) }))
       if (!title.trim()) setTitle(out.title)
-      // Si el quiz todavía está vacío se reemplaza; si ya tiene preguntas, se agregan al final.
-      setQuestions((qs) => [...qs.filter((q) => !isEmpty(q)), ...generated])
+      // Las preguntas de una generación anterior se reemplazan; las manuales se conservan y las nuevas van al final.
+      deleteQuestionImages(questions.filter((q) => aiIds.includes(q.id)).flatMap((q) => [q.image_url, q.reveal_image_url]))
+      setQuestions((qs) => [...qs.filter((q) => !aiIds.includes(q.id) && !isEmpty(q)), ...generated])
+      setAiIds(generated.map((g) => g.id))
       setAi((a) => ({ ...a, open: false, busy: false }))
     } catch (err) {
       setAi((a) => ({ ...a, busy: false, error: errorMessage(err) }))
@@ -197,18 +205,21 @@ function QuizEditor() {
                 </label>
                 <label className="sticker-label">
                   Cantidad
-                  <input form={AI_FORM} className="sticker-input w-24 p-2 text-center" type="number" min={1} max={AI_MAX} value={ai.count}
+                  <input form={AI_FORM} className="sticker-input w-24 p-2 text-center" type="number" min={1} max={Math.max(aiRoom, 1)} value={ai.count}
                     onChange={(e) => setAi((a) => ({ ...a, count: Number(e.target.value) }))} required disabled={ai.busy} />
                 </label>
               </div>
               {ai.error && <p className="sticker-note" role="alert">{ai.error}</p>}
               <div className="flex flex-wrap items-center gap-3">
                 <button form={AI_FORM} className="sticker-btn sticker-btn-sm gap-2" disabled={ai.busy}>
-                  {ai.busy ? <><Spinner /> Armando preguntas…</> : 'Generar'}
+                  {ai.busy ? <><Spinner /> Armando preguntas…</> : aiIds.length ? 'Regenerar' : 'Generar'}
                 </button>
                 <button type="button" className="quiet-link" disabled={ai.busy} onClick={() => setAi((a) => ({ ...a, open: false, error: '' }))}>Cancelar</button>
               </div>
-              <p className="text-sm text-ink-soft">Revisá las preguntas antes de guardar: la IA se puede equivocar.</p>
+              <p className="text-sm text-ink-soft">
+                {aiIds.length ? 'Al regenerar se reemplazan las preguntas armadas por la IA; las que escribiste vos se conservan. ' : ''}
+                Máximo {AI_MAX} preguntas por quiz. Revisá todo antes de guardar: la IA se puede equivocar.
+              </p>
             </div>
           ) : (
             <button type="button" className="sticker-btn-ghost sticker-btn-sm self-start" onClick={() => setAi((a) => ({ ...a, open: true }))}>
